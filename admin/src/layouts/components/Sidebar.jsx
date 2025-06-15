@@ -166,29 +166,60 @@ const Sidebar = ({ open, onClose }) => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          p: miniVariant ? 1 : 2,
+          p: miniVariant ? 1.5 : 2.5,
           borderBottom: `1px solid ${theme.palette.divider}`,
+          backgroundColor: theme.palette.background.paper,
+          background: `linear-gradient(135deg, rgba(255, 87, 34, 0.05), rgba(255, 87, 34, 0.02))`,
         }}
       >
         <Box
           component="img"
           src="../logo.png"
-          alt="Neobot"
-          sx={{ height: 40, mr: miniVariant ? 0 : 1 }}
+          alt="Neobot Admin"
+          sx={{
+            height: miniVariant ? 32 : 45,
+            mr: miniVariant ? 0 : 1.5,
+            filter: 'drop-shadow(0px 2px 4px rgba(0, 0, 0, 0.1))',
+            transition: 'all 0.3s ease',
+            '&:hover': {
+              transform: 'scale(1.05)',
+              filter: 'drop-shadow(0px 4px 8px rgba(255, 87, 34, 0.3))',
+            }
+          }}
         />
         {!miniVariant && (
-          <Typography
-            variant="h6"
-            component={Link}
-            to="/dashboard"
-            sx={{
-              textDecoration: 'none',
-              color: theme.palette.primary.main,
-              fontWeight: 'bold',
-            }}
-          >
-            Admin Panel
-          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+            <Typography
+              variant="h6"
+              component={Link}
+              to="/dashboard"
+              sx={{
+                textDecoration: 'none',
+                color: theme.palette.primary.main,
+                fontWeight: 'bold',
+                fontSize: '1.1rem',
+                lineHeight: 1.2,
+                '&:hover': {
+                  color: '#ff5722',
+                  transition: 'color 0.3s ease',
+                }
+              }}
+            >
+              Neobot
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{
+                color: theme.palette.text.secondary,
+                fontSize: '0.75rem',
+                fontWeight: 500,
+                letterSpacing: '0.5px',
+                textTransform: 'uppercase',
+              }}
+            >
+              Admin Panel
+            </Typography>
+          </Box>
         )}
       </Box>
 

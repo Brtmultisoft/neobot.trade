@@ -32,6 +32,13 @@ interface TradingActivationProps {
   sessionTime: number;
   totalProfit?: number; // Make optional since we're not using it
   activeTrades?: number; // Make optional since we're not using it
+  // Dynamic user data props
+  userData?: any;
+  currentTradingPackage?: any;
+  userROIRate?: number;
+  totalInvestment?: number;
+  dailyProfitAmount?: number;
+  loading?: boolean;
 }
 
 // Define animations - slowed down for smoother transitions
@@ -105,20 +112,27 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
   // We're not using these props but keeping them in the interface for backward compatibility
   // totalProfit,
   // activeTrades
+  // Dynamic user data props
+  userData: propUserData,
+  currentTradingPackage: propTradingPackage,
+  userROIRate: propUserROIRate,
+  totalInvestment: propTotalInvestment,
+  dailyProfitAmount: propDailyProfitAmount,
+  loading: propLoading
 }) => {
   // Theme and responsive setup
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   // Local state with optimized initial values
-  const [userData, setUserData] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [userData, setUserData] = useState<any>(propUserData || null);
+  const [isLoading, setIsLoading] = useState(propLoading || false);
   const [activatingProfit, setActivatingProfit] = useState(false);
   const [alreadyActivated, setAlreadyActivated] = useState(tradingActive); // Initialize based on prop
 
   // State for income calculation - split into separate states for better performance
-  const [totalInvested, setTotalInvested] = useState(0);
-  const [dailyProfitRate] = useState(0.266); // 0.266% daily profit rate (constant)
-  const [dailyProfitAmount, setDailyProfitAmount] = useState(0);
+  const [totalInvested, setTotalInvested] = useState(propTotalInvestment || 0);
+  const [dailyProfitRate] = useState(propUserROIRate || 0.266); // Use dynamic ROI rate or fallback to 0.266%
+  const [dailyProfitAmount, setDailyProfitAmount] = useState(propDailyProfitAmount || 0);
   const [currentProfit, setCurrentProfit] = useState(0);
   const [lastActivationTime, setLastActivationTime] = useState<Date | null>(null);
   const [timeElapsed, setTimeElapsed] = useState('00:00:00');

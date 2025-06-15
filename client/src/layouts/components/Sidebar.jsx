@@ -84,17 +84,37 @@ const Sidebar = ({ open, onClose }) => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          p: 2.5,
+          height: 64, // Standard navbar height
+          px: 2.5,
           backgroundColor: theme.palette.background.paper,
           borderBottom: `1px solid ${theme.palette.divider}`,
         }}
       >
-        <Box
-          component="img"
-          src="./logo.png"
-          alt="Neobot"
-          sx={{ height: 40, display: 'block', mx: 'auto' }}
-        />
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box
+            component="img"
+            src="./logo.png"
+            alt="Neobot"
+            sx={{
+              height: 48,
+              filter: 'drop-shadow(0px 2px 4px rgba(0, 0, 0, 0.1))',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'scale(1.05)',
+                filter: 'drop-shadow(0px 4px 8px rgba(51, 117, 187, 0.3))',
+              }
+            }}
+          />
+          <Box
+            sx={{
+              color: theme.palette.primary.main,
+              fontWeight: 'bold',
+              fontSize: '1.2rem',
+            }}
+          >
+            Neobot
+          </Box>
+        </Box>
       </Box>
 
       {/* User Info */}

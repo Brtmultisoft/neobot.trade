@@ -14,6 +14,8 @@ import BasePriceDisplay from './BasePriceDisplay';
 import FloatingProfits from './FloatingProfits';
 import { useTradingData } from '../../hooks/useTradingData';
 import UserService from '../../services/user.service';
+import InvestmentService from '../../services/investment.service';
+import TradingPackageService from '../../services/tradingpackage.service';
 
 const TradingDashboard: React.FC = () => {
 // const {
@@ -61,6 +63,14 @@ const TradingDashboard: React.FC = () => {
   const [basePrice, setBasePrice] = useState<number | null>(null);
 
   const [loading, setLoading] = useState<boolean>(true);
+
+  // User dynamic data states
+  const [userData, setUserData] = useState<any>(null);
+  const [userInvestments, setUserInvestments] = useState<any[]>([]);
+  const [currentTradingPackage, setCurrentTradingPackage] = useState<any>(null);
+  const [userROIRate, setUserROIRate] = useState<number>(1.0);
+  const [totalInvestment, setTotalInvestment] = useState<number>(0);
+  const [dailyProfitAmount, setDailyProfitAmount] = useState<number>(0);
   // Update currentPrice when binancePrice changes
   useEffect(() => {
     if (binancePrice !== null) {
@@ -181,55 +191,109 @@ const TradingDashboard: React.FC = () => {
     };
   }, [tradingActive, incrementSessionTime]);
 
-  // Generate floating profits when trading is active
+  // Generate dynamic floating profits based on user's actual investment and ROI
   useEffect(() => {
     let profitInterval: number;
 
-    if (tradingActive) {
+    if (tradingActive && totalInvestment > 0) {
       profitInterval = window.setInterval(() => {
-        const isProfit = Math.random() > 0.003;
-        const amount = isProfit ?
-          (Math.random() * 0.005) :
-          (-Math.random() * 0.003);
+        // Calculate profit based on user's actual investment and ROI rate
+        const baseProfit = (totalInvestment * userROIRate) / 100; // Daily profit
+        const profitPerSecond = baseProfit / (24 * 60 * 60); // Convert to per second
+
+        // Add some randomness (±20% variation)
+        const randomMultiplier = 0.8 + (Math.random() * 0.4); // 0.8 to 1.2
+        const actualProfit = profitPerSecond * randomMultiplier;
+
+        // 95% chance of profit, 5% chance of small loss
+        const isProfit = Math.random() > 0.05;
+        const amount = isProfit ? actualProfit : (-actualProfit * 0.1);
 
         // Update total profit
         setTotalProfit(prev => prev + amount);
+
+        // Log profit details for debugging
+        if (Math.random() < 0.01) { // Log 1% of the time to avoid spam
+          console.log(`Dynamic profit: $${amount.toFixed(6)} (Base: $${baseProfit.toFixed(2)}/day, ROI: ${userROIRate}%)`);
+        }
       }, 1000);
     }
 
     return () => {
       if (profitInterval) clearInterval(profitInterval);
     };
-  }, [tradingActive, setTotalProfit]);
+  }, [tradingActive, totalInvestment, userROIRate, setTotalProfit]);
 
   // Handle trading activation
   const handleActivateTrading = () => {
     setTradingActive(true);
   };
-  const getUserProfile = async () => {
+  // Fetch user's dynamic trading data
+  const fetchUserTradingData = async () => {
     try {
-      const response = await UserService.getUserProfile();
-      if (response && response.status) {
-        const user = response.result;
-        // setUserData(user);
-        console.log("res users",user,response);
-        if(user.dailyProfitActivated){
-        console.log("Trading activated",user.dailyProfitActivated,
-          "last actived", user.lastDailyProfitActivation
-        );
-        
+      setLoading(true);
+
+      // 1. Get user profile
+      const userResponse = await UserService.getUserProfile();
+      if (userResponse && userResponse.status) {
+        const user = userResponse.result;
+        setUserData(user);
+
+        console.log("User profile loaded:", user);
+
+        // 2. Get user investments
+        const investmentResponse = await InvestmentService.getUserInvestments();
+        if (investmentResponse && investmentResponse.status && investmentResponse.data?.docs) {
+          const investments = investmentResponse.data.docs;
+          setUserInvestments(investments);
+
+          // Calculate total investment
+          const totalInvested = investments.reduce((sum: number, inv: any) => sum + (inv.amount || 0), 0);
+          setTotalInvestment(totalInvested);
+
+          console.log("User investments loaded:", investments);
+          console.log("Total investment amount:", totalInvested);
+
+          // 3. Get current trading package info
+          if (user.current_trading_package_id) {
+            try {
+              const packageResponse = await TradingPackageService.getTradingPackageById(user.current_trading_package_id);
+              if (packageResponse && packageResponse.status) {
+                const tradingPackage = packageResponse.data;
+                setCurrentTradingPackage(tradingPackage);
+                setUserROIRate(tradingPackage.daily_trading_roi || 1.0);
+
+                // Calculate daily profit based on user's actual investment and package ROI
+                const dailyProfit = (totalInvested * (tradingPackage.daily_trading_roi || 1.0)) / 100;
+                setDailyProfitAmount(dailyProfit);
+
+                console.log("Current trading package:", tradingPackage);
+                console.log("User ROI rate:", tradingPackage.daily_trading_roi);
+                console.log("Daily profit amount:", dailyProfit);
+              }
+            } catch (packageError) {
+              console.error('Error fetching trading package:', packageError);
+              // Fallback to default values
+              setUserROIRate(1.0);
+              setDailyProfitAmount((totalInvested * 1.0) / 100);
+            }
+          } else {
+            // No current package, use default ROI
+            console.log("No current trading package found, using default ROI");
+            setUserROIRate(1.0);
+            setDailyProfitAmount((totalInvested * 1.0) / 100);
+          }
         }
-        
       }
     } catch (error) {
-      console.error('Error fetching user profile:', error);
+      console.error('Error fetching user trading data:', error);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    getUserProfile();
+    fetchUserTradingData();
   }, []);
 
   return (
@@ -253,6 +317,13 @@ const TradingDashboard: React.FC = () => {
               sessionTime={sessionTime}
               totalProfit={totalProfit}
               activeTrades={activeTrades}
+              // Dynamic user data
+              userData={userData}
+              currentTradingPackage={currentTradingPackage}
+              userROIRate={userROIRate}
+              totalInvestment={totalInvestment}
+              dailyProfitAmount={dailyProfitAmount}
+              loading={loading}
             />
           </Box>
         </CustomGrid>

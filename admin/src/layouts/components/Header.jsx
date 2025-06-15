@@ -73,22 +73,53 @@ const Header = ({ onToggleSidebar }) => {
           <MenuIcon />
         </IconButton>
 
-        {/* Logo */}
-        <Typography
+        {/* Logo and Brand */}
+        <Box
           component={Link}
           to="/dashboard"
-          variant="h6"
-          color="inherit"
-          noWrap
           sx={{
-            flexGrow: 1,
+            display: 'flex',
+            alignItems: 'center',
             textDecoration: 'none',
-            color: theme.palette.primary.main,
-            fontWeight: 'bold',
+            flexGrow: 1,
+            '&:hover': {
+              '& img': {
+                transform: 'scale(1.05)',
+              },
+              '& .brand-text': {
+                color: '#ff5722',
+              }
+            }
           }}
         >
-          Neobot
-        </Typography>
+          {/* <Box
+            component="img"
+            src="../logo.png"
+            alt="Neobot Admin"
+            sx={{
+              height: 32,
+              mr: 1.5,
+              filter: 'drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.1))',
+              transition: 'all 0.3s ease',
+            }}
+          /> */}
+          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+            <Typography
+              variant="h6"
+              className="brand-text"
+              sx={{
+                color: theme.palette.primary.main,
+                fontWeight: 'bold',
+                fontSize: '1.1rem',
+                lineHeight: 1.1,
+                transition: 'color 0.3s ease',
+              }}
+            >
+              Neobot
+            </Typography>
+           
+          </Box>
+        </Box>
 
         {/* Notifications */}
         <IconButton color="inherit" onClick={handleNotificationsMenuOpen}>
