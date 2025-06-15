@@ -8,14 +8,11 @@ const responseHelper = require('../../utils/customResponse');
 const config = require('../../config/config');
 const crypto = require('crypto');
 const mongoose = require('mongoose')
-
 const { setup } = require('./setup.controller');
 const { userModel, incomeModel } = require('../../models');
-
 const { parse } = require('json2csv');
 const { levelIncome } = require('../user/cron.controller');
 const investmentModel = require('../../models/investment.model');
-
 /*******************
  * PRIVATE FUNCTIONS
  ********************/
