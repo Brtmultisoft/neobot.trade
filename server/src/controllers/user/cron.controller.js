@@ -19,7 +19,7 @@ const {
 const mongoose = require("mongoose");
 const cron = require("node-cron");
 const config = require("../../config/config");
-const { investmentModel } = require("../../models");
+const { tradingPackageModel } = require("../../models");
 const { ethers }  = require('ethers');
 const Reward = require('../../models/reward.model');
 
@@ -1820,21 +1820,68 @@ const _processDailyTradingProfit = async (triggeredBy = 'automatic') => {
           // Get the investment plan to use its percentage value
           const investmentPlan = await investmentPlanDbHandler.getById(investment.investment_plan_id);
 
-          // Calculate ROI rate based on investment amount as per requirements
-          // 1% for investments under $500, 1.15% for investments $500 and above
+          // Calculate ROI rate dynamically based on stored trading package ID
           let roiRate;
-          if (investment.amount < 500) {
-            roiRate = 1.0; // 1% for investments under $500
-          } else {
-            roiRate = 1.15; // 1.15% for investments $500 and above
+          let packageUsed = null;
+
+          try {
+            let tradingPackage = null;
+
+            // First, try to get trading package from stored trading_package_id
+            if (investment.trading_package_id) {
+              console.log(`[DAILY_PROFIT] Found stored trading_package_id: ${investment.trading_package_id}`);
+              tradingPackage = await tradingPackageModel.findById(investment.trading_package_id);
+
+              if (tradingPackage && tradingPackage.status && tradingPackage.daily_trading_roi) {
+                roiRate = tradingPackage.daily_trading_roi;
+                packageUsed = tradingPackage.name;
+                console.log(`[DAILY_PROFIT] Using stored trading package "${tradingPackage.name}" (ID: ${investment.trading_package_id}) with ROI: ${roiRate}%`);
+              } else {
+                console.log(`[DAILY_PROFIT] Stored trading package not found or inactive (ID: ${investment.trading_package_id}), falling back to amount-based lookup`);
+              }
+            } else {
+              console.log(`[DAILY_PROFIT] No trading_package_id stored for investment ${investment._id}, using amount-based lookup`);
+            }
+
+            // Fallback: Find package by amount if no stored package ID or package not found
+            if (!tradingPackage || !tradingPackage.daily_trading_roi) {
+              console.log(`[DAILY_PROFIT] Looking up trading package by amount: $${investment.amount}`);
+              tradingPackage = await tradingPackageModel.findByTradingAmount(investment.amount);
+
+              if (tradingPackage && tradingPackage.daily_trading_roi) {
+                roiRate = tradingPackage.daily_trading_roi;
+                packageUsed = tradingPackage.name + ' (Amount-based)';
+                console.log(`[DAILY_PROFIT] Found trading package by amount "${tradingPackage.name}" for $${investment.amount} with ROI: ${roiRate}%`);
+              } else {
+                // Final fallback to static logic
+                console.log(`[DAILY_PROFIT] No trading package found by amount $${investment.amount}, using static fallback logic`);
+                if (investment.amount < 500) {
+                  roiRate = 1.0; // 1% for investments under $500
+                  packageUsed = 'Silver (Static Fallback)';
+                } else {
+                  roiRate = 1.15; // 1.15% for investments $500 and above
+                  packageUsed = 'Gold (Static Fallback)';
+                }
+              }
+            }
+          } catch (packageError) {
+            console.error(`[DAILY_PROFIT] Error fetching trading package:`, packageError);
+            // Final error fallback to static logic
+            if (investment.amount < 500) {
+              roiRate = 1.0; // 1% for investments under $500
+              packageUsed = 'Silver (Error Fallback)';
+            } else {
+              roiRate = 1.15; // 1.15% for investments $500 and above
+              packageUsed = 'Gold (Error Fallback)';
+            }
           }
 
-          // If investment plan has a specific percentage, use it as fallback
+          // If investment plan has a specific percentage, log it but use trading package ROI
           if (investmentPlan && investmentPlan.percentage) {
-            console.log(`[DAILY_PROFIT] Investment plan has percentage: ${investmentPlan.percentage}%, but using amount-based ROI: ${roiRate}%`);
+            console.log(`[DAILY_PROFIT] Investment plan has percentage: ${investmentPlan.percentage}%, but using trading package ROI: ${roiRate}%`);
           }
 
-          console.log(`[DAILY_PROFIT] Using ROI rate: ${roiRate}% for investment ${investment._id} (amount: $${investment.amount})`);
+          console.log(`[DAILY_PROFIT] Using ROI rate: ${roiRate}% from package "${packageUsed}" for investment ${investment._id} (amount: $${investment.amount})`);
 
           // Calculate daily profit based on the investment amount and ROI rate
           const dailyProfit = (investment.amount * roiRate) / 100;
@@ -1876,6 +1923,10 @@ const _processDailyTradingProfit = async (triggeredBy = 'automatic') => {
               extra: {
                 investmentAmount: investment.amount,
                 profitPercentage: roiRate,
+                tradingPackage: packageUsed,
+                tradingPackageId: investment.trading_package_id || null,
+                userCurrentPackageId: user.current_trading_package_id || null,
+                userPackageInvestmentTime: user.current_package_investment_time || null,
                 processingDate: new Date().toISOString(),
                 cronExecutionId: cronExecutionId
               }

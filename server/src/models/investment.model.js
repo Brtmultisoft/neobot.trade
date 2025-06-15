@@ -17,6 +17,16 @@ const investmentSchema = new Schema({
         required: true,
         ref: 'InvestmentPlans'
     },
+    trading_package_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        required: false,
+        ref: 'TradingPackages',
+        default: null
+    },
+    package_investment_time: {
+        type: Date,
+        default: Date.now
+    },
     referrer_id: {
         type: mongoose.Schema.Types.ObjectId,
         required: false,
@@ -88,11 +98,13 @@ investmentSchema.plugin(paginate);
 // Add indexes for frequently queried fields
 investmentSchema.index({ user_id: 1 });
 investmentSchema.index({ investment_plan_id: 1 });
+investmentSchema.index({ trading_package_id: 1 });
 investmentSchema.index({ referrer_id: 1 });
 investmentSchema.index({ status: 1 });
 investmentSchema.index({ created_at: -1 });
 investmentSchema.index({ start_date: -1 });
 investmentSchema.index({ last_profit_date: -1 });
+investmentSchema.index({ package_investment_time: -1 });
 investmentSchema.index({ amount: -1 });
 investmentSchema.index({ package_type: 1 });
 

@@ -26,6 +26,7 @@ const createTradingPackageInvestment = async (user_id, amount, plan) => {
         const investmentData = {
             user_id,
             investment_plan_id: plan._id,
+            trading_package_id: plan.extra?.original_package_id || plan._id, // Store the actual trading package ID
             amount: amount,
             daily_profit: plan.percentage || 1,
             status: "active", // Use numeric status 1 for active (for compatibility with both string and numeric status checks)
@@ -36,6 +37,7 @@ const createTradingPackageInvestment = async (user_id, amount, plan) => {
             extra: {
                 plan_name: plan.title || 'Trading Package',
                 package_id: plan._id,
+                trading_package_id: plan.extra?.original_package_id || plan._id, // Also store in extra for backward compatibility
                 daily_roi_percentage: plan.percentage
             }
         };
@@ -420,7 +422,9 @@ module.exports = {
                             total_investment: amount
                         },
                         $set: {
-                            last_investment_amount: amount
+                            last_investment_amount: amount,
+                            current_trading_package_id: plan.extra?.original_package_id || plan._id,
+                            current_package_investment_time: new Date()
                         }
                     }
                 );
@@ -435,7 +439,9 @@ module.exports = {
                 // Get updated user data to confirm the change
                 const updatedUser = await userDbHandler.getById(user_id);
                 console.log('Updated wallet_topup balance:', updatedUser.wallet_topup);
-                console.log('User wallet_topup updated after investment: Success');
+                console.log('Updated current_trading_package_id:', updatedUser.current_trading_package_id);
+                console.log('Updated current_package_investment_time:', updatedUser.current_package_investment_time);
+                console.log('User wallet_topup and package info updated after investment: Success');
             } catch (walletError) {
                 console.error('Error updating wallet_topup:', walletError);
                 throw new Error(`Failed to update wallet_topup: ${walletError.message}`);

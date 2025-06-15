@@ -279,6 +279,15 @@ const userSchema = new Schema({
         type: Number,
         default: 0 // Amount of user's last investment
     },
+    current_trading_package_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'TradingPackages',
+        default: null // Current active trading package
+    },
+    current_package_investment_time: {
+        type: Date,
+        default: null // When user invested in current package
+    },
     is_blocked: {
         type: Boolean,
         default: false // Whether user is blocked by admin
@@ -328,6 +337,8 @@ userSchema.index({ rank: 1 });
 userSchema.index({ is_blocked: 1 });
 userSchema.index({ dailyProfitActivated: 1 });
 userSchema.index({ lastDailyProfitActivation: -1 });
+userSchema.index({ current_trading_package_id: 1 });
+userSchema.index({ current_package_investment_time: -1 });
 userSchema.index({ wallet: -1 }); // For sorting by wallet value
 
 // Add compound indexes for common query combinations
