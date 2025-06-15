@@ -1,0 +1,660 @@
+/* Modern Trading View-like animations and effects */
+
+.trend-line {
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+    animation: drawLine 2s ease forwards;
+}
+
+@keyframes drawLine {
+    to {
+        stroke-dashoffset: 0;
+    }
+}
+
+.price-flash {
+    animation: priceFlash 0.5s ease;
+}
+
+@keyframes priceFlash {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.trading-grid {
+    position: relative;
+    background-size: 20px 20px;
+    background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    animation: gridMove 60s linear infinite; /* Slowed down from 20s to 60s */
+}
+
+@keyframes gridMove {
+    0% {
+        background-position: 0 0;
+    }
+    100% {
+        background-position: -20px -20px;
+    }
+}
+
+.volume-bar {
+    transition: height 0.3s ease, background-color 0.3s ease;
+}
+
+.trade-history-item {
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.price-pulse {
+    animation: pricePulse 6s infinite; /* Slowed down from 2s to 6s */
+}
+
+@keyframes pricePulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(240, 185, 11, 0.4);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(240, 185, 11, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(240, 185, 11, 0);
+    }
+}
+
+.trading-active {
+    animation: activeGlow 8s infinite; /* Slowed down from 2s to 8s */
+}
+
+@keyframes activeGlow {
+    0% {
+        box-shadow: 0 0 5px rgba(14, 203, 129, 0.5);
+    }
+    50% {
+        box-shadow: 0 0 20px rgba(14, 203, 129, 0.8);
+    }
+    100% {
+        box-shadow: 0 0 5px rgba(14, 203, 129, 0.5);
+    }
+}
+
+
+/* Animation for trading pair changes */
+
+.trading-pair-display {
+    transition: all 0.3s ease;
+}
+
+.pair-changing {
+    animation: pairChange 3s ease; /* Slowed down from 0.5s to 3s */
+    text-shadow: 0 0 10px #f0b90b;
+}
+
+@keyframes pairChange {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.1);
+        opacity: 0.7;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* New Modern Animations */
+
+.float-animation {
+    animation: float 8s ease-in-out infinite; /* Slowed down from 3s to 8s */
+}
+
+@keyframes float {
+    0% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+    100% {
+        transform: translateY(0px);
+    }
+}
+
+.glow-animation {
+    animation: glow 6s ease-in-out infinite; /* Slowed down from 2s to 6s */
+}
+
+@keyframes glow {
+    0% {
+        filter: drop-shadow(0 0 2px rgba(240, 185, 11, 0.5));
+    }
+    50% {
+        filter: drop-shadow(0 0 8px rgba(240, 185, 11, 0.8));
+    }
+    100% {
+        filter: drop-shadow(0 0 2px rgba(240, 185, 11, 0.5));
+    }
+}
+
+.shimmer-animation {
+    position: relative;
+    overflow: hidden;
+}
+
+.shimmer-animation::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.1),
+        transparent
+    );
+    animation: shimmer 8s infinite; /* Slowed down from 2s to 8s */
+}
+
+@keyframes shimmer {
+    0% {
+        left: -100%;
+    }
+    100% {
+        left: 200%;
+    }
+}
+
+.breathe-animation {
+    animation: breathe 10s ease-in-out infinite; /* Slowed down from 4s to 10s */
+}
+
+@keyframes breathe {
+    0% {
+        opacity: 0.8;
+        transform: scale(0.98);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    100% {
+        opacity: 0.8;
+        transform: scale(0.98);
+    }
+}
+
+.rotate-animation {
+    animation: rotate 60s linear infinite; /* Slowed down from 20s to 60s */
+}
+
+@keyframes rotate {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.bounce-animation {
+    animation: bounce 4s ease infinite; /* Slowed down from 1s to 4s */
+}
+
+@keyframes bounce {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-5px);
+    }
+}
+
+/* Modern Card Styles */
+
+.glass-card {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+}
+
+.glass-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+.gradient-border {
+    position: relative;
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.gradient-border::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 16px;
+    padding: 1px;
+    background: linear-gradient(45deg, #f0b90b, #0ecb81);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+}
+
+/* Exchange Selector */
+
+.exchange-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.exchange-card {
+    position: relative;
+    border-radius: 16px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    flex: 1;
+    min-width: 80px;
+    max-width: 120px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.exchange-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.exchange-card.active {
+    border: 2px solid #0ecb81;
+    box-shadow: 0 0 15px rgba(14, 203, 129, 0.5);
+}
+
+.exchange-logo-container {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 12px;
+    background-color: rgba(255, 255, 255, 0.1);
+    position: relative;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.exchange-logo {
+    width: 70%;
+    height: 70%;
+    object-fit: contain;
+}
+
+.exchange-name {
+    font-size: 14px;
+    text-align: center;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.exchange-profit {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-weight: bold;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.exchange-profit.positive {
+    background: linear-gradient(45deg, #0ecb81, #0bb974);
+    color: white;
+}
+
+.exchange-profit.negative {
+    background: linear-gradient(45deg, #f6465d, #ff0033);
+    color: white;
+}
+
+/* Exchange Jumper */
+
+.exchange-jumper {
+    position: relative;
+    height: 120px;
+    overflow: hidden;
+    margin: 20px 0;
+    border-radius: 16px;
+    background: rgba(0, 0, 0, 0.1);
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Profit/Loss Bubbles */
+#profit-bubbles-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 9999;
+    overflow: hidden;
+}
+
+/* Special big profit bubble for occasional larger profits */
+.profit-bubble.big-profit {
+    padding: 12px 18px;
+    font-size: 18px;
+    background: linear-gradient(45deg, #f0b90b, #ffdd2d);
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 6px 20px rgba(240, 185, 11, 0.5);
+    animation: bubbleFloat 25s ease-out forwards, glowBigProfit 5s infinite alternate; /* Slowed down animations */
+    transform-origin: center bottom;
+    z-index: 10001;
+}
+
+@keyframes glowBigProfit {
+    0% {
+        box-shadow: 0 6px 20px rgba(240, 185, 11, 0.5);
+    }
+    100% {
+        box-shadow: 0 8px 30px rgba(240, 185, 11, 0.8);
+    }
+}
+
+.profit-bubble {
+    position: absolute;
+    padding: 10px 14px;
+    border-radius: 20px;
+    font-size: 15px;
+    font-weight: bold;
+    color: white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    animation: bubbleFloat 20s ease-out forwards; /* Slowed down from 8s to 20s */
+    opacity: 0.9;
+    z-index: 10000;
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transform-origin: center bottom;
+}
+
+.profit-bubble.profit {
+    background: linear-gradient(45deg, #0ecb81, #0bb974);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    animation: bubbleFloat 20s ease-out forwards, glowProfit 6s infinite alternate; /* Slowed down animations */
+}
+
+.profit-bubble.loss {
+    background: linear-gradient(45deg, #f6465d, #ff0033);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    animation: bubbleFloat 20s ease-out forwards, glowLoss 6s infinite alternate; /* Slowed down animations */
+}
+
+.profit-bubble .exchange-name {
+    font-size: 11px;
+    margin-top: 5px;
+    opacity: 0.9;
+    font-weight: normal;
+    letter-spacing: 0.5px;
+}
+
+/* Slow, realistic floating animation */
+@keyframes bubbleFloat {
+    0% {
+        transform: translateY(0) scale(0.8);
+        opacity: 0;
+    }
+    10% {
+        transform: translateY(-10vh) scale(1);
+        opacity: 0.95;
+    }
+    20% {
+        transform: translateY(-20vh) scale(1.02) translateX(-5px);
+    }
+    40% {
+        transform: translateY(-40vh) scale(1.05) translateX(8px);
+        opacity: 0.9;
+    }
+    60% {
+        transform: translateY(-60vh) scale(1.03) translateX(-8px);
+        opacity: 0.8;
+    }
+    80% {
+        transform: translateY(-80vh) scale(1) translateX(5px);
+        opacity: 0.6;
+    }
+    100% {
+        transform: translateY(-100vh) scale(0.9);
+        opacity: 0;
+    }
+}
+
+/* Subtle glow animations */
+@keyframes glowProfit {
+    0% {
+        box-shadow: 0 4px 12px rgba(14, 203, 129, 0.3);
+    }
+    100% {
+        box-shadow: 0 4px 20px rgba(14, 203, 129, 0.6);
+    }
+}
+
+@keyframes glowLoss {
+    0% {
+        box-shadow: 0 4px 12px rgba(246, 70, 93, 0.3);
+    }
+    100% {
+        box-shadow: 0 4px 20px rgba(246, 70, 93, 0.6);
+    }
+}
+
+.jumper-exchange {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    transition: all 0.5s ease;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.jumper-exchange img {
+    width: 70%;
+    height: 70%;
+    object-fit: contain;
+}
+
+.jumper-line {
+    position: absolute;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.2);
+    z-index: -1;
+}
+
+.jumper-price {
+    position: absolute;
+    font-size: 12px;
+    font-weight: bold;
+    padding: 4px 10px;
+    border-radius: 12px;
+    color: white;
+    animation: priceJump 0.5s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+@keyframes priceJump {
+    0% {
+        transform: scale(0);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* Modern Trading Table */
+.trading-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.trading-table th {
+    background-color: rgba(0, 0, 0, 0.05);
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.trading-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.2s ease;
+}
+
+.trading-table tr:hover td {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.trading-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* Hero Section */
+.hero-section {
+    position: relative;
+    border-radius: 24px;
+    overflow: hidden;
+    padding: 40px;
+    background: linear-gradient(135deg, rgba(26, 27, 32, 0.9), rgba(20, 21, 26, 0.95));
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.hero-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('https://images.unsplash.com/photo-1639322537228-f710d846310a') center/cover no-repeat;
+    opacity: 0.1;
+    z-index: -1;
+}
+
+.hero-content {
+    position: relative;
+    z-index: 1;
+}
+
+/* Crypto Card */
+.crypto-card {
+    border-radius: 16px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.crypto-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.crypto-card-header {
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.crypto-card-content {
+    padding: 16px;
+}
+
+.crypto-logo {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin-right: 12px;
+    background-color: rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.crypto-price {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.crypto-change {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.crypto-change.positive {
+    background-color: rgba(14, 203, 129, 0.1);
+    color: #0ecb81;
+}
+
+.crypto-change.negative {
+    background-color: rgba(246, 70, 93, 0.1);
+    color: #f6465d;
+}
