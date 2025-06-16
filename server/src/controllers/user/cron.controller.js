@@ -630,6 +630,55 @@ const processTeamCommission = async (user_id, amount) => {
       if (hasInvested) {
         console.log(`User has invested. Processing commission...`);
 
+        // Check if this upline user has already received level ROI from this specific downline user today
+        const today = new Date();
+        const istOffset = 5.5 * 60 * 60 * 1000;
+        const todayIST = new Date(today.getTime() + istOffset);
+        todayIST.setHours(0, 0, 0, 0);
+
+        const existingLevelRoi = await incomeDbHandler.getOneByQuery({
+          user_id: currentUser._id,
+          user_id_from: user_id,
+          type: 'level_roi_income',
+          level: level,
+          created_at: {
+            $gte: todayIST,
+            $lt: new Date(todayIST.getTime() + 24 * 60 * 60 * 1000)
+          }
+        });
+
+        if (existingLevelRoi) {
+          console.log(`❌ Level ${level} ROI already distributed from user ${user_id} to user ${currentUser._id} today. Skipping...`);
+          // Move to next level instead of skipping entirely
+          if (currentUser.refer_id) {
+            if (currentUser.refer_id === 'admin') {
+              console.log(`Found special 'admin' refer_id. Looking up admin user...`);
+              const adminUser = await userDbHandler.getOneByQuery({ _id: "678f9a82a2dac325900fc47e" });
+              if (adminUser) {
+                console.log(`Found admin user: ${adminUser.username || adminUser.email} (ID: ${adminUser._id})`);
+                currentUser = adminUser;
+              } else {
+                console.log(`Admin user not found. Breaking out of loop.`);
+                break;
+              }
+            } else {
+              const nextUser = await userDbHandler.getById(currentUser.refer_id);
+              console.log(`Moving to next level. Next upline user: ${nextUser ? (nextUser.username || nextUser.email) : 'None'} (ID: ${nextUser?._id})`);
+              if (nextUser) {
+                currentUser = nextUser;
+              } else {
+                console.log(`Next upline user not found. Breaking out of loop.`);
+                break;
+              }
+            }
+          } else {
+            console.log(`No more upline users. Breaking out of loop.`);
+            break;
+          }
+          level++;
+          continue;
+        }
+
         // Use the actual daily profit amount directly (amount parameter is the daily profit received)
         console.log(`Using actual daily profit amount: $${amount.toFixed(4)}`);
 
@@ -1582,14 +1631,15 @@ const _processLevelRoiIncome = async (triggeredBy = 'automatic') => {
         console.log(`[LEVEL_ROI] Processing level ROI for user: ${user.username || user.email} (ID: ${user._id})`);
         console.log(`[LEVEL_ROI] User's total daily profit today: $${userProfitData.total_profit.toFixed(4)}`);
 
-        // Check if user has already received level ROI today to prevent duplicates
-        const lastLevelRoiDate = user.last_level_roi_date || user.extra?.last_level_roi_date;
-        if (lastLevelRoiDate) {
-          const lastRoiDate = new Date(lastLevelRoiDate);
-          lastRoiDate.setHours(0, 0, 0, 0);
+        // Check if level ROI has already been processed for this user today to prevent duplicates
+        // Note: We check if this specific user has already triggered level ROI processing today
+        const lastLevelRoiProcessedDate = user.last_level_roi_processed_date || user.extra?.last_level_roi_processed_date;
+        if (lastLevelRoiProcessedDate) {
+          const lastProcessedDate = new Date(lastLevelRoiProcessedDate);
+          lastProcessedDate.setHours(0, 0, 0, 0);
 
-          if (lastRoiDate.getTime() === todayIST.getTime()) {
-            console.log(`[LEVEL_ROI] User ${userId} already received level ROI today. Skipping...`);
+          if (lastProcessedDate.getTime() === todayIST.getTime()) {
+            console.log(`[LEVEL_ROI] Level ROI already processed for user ${userId} today. Skipping...`);
             skippedCount++;
             continue;
           }
@@ -1619,12 +1669,13 @@ const _processLevelRoiIncome = async (triggeredBy = 'automatic') => {
           console.log(`[LEVEL_ROI] Level ROI processing result: ${teamCommissionResult ? 'Success' : 'Failed'}`);
 
           if (teamCommissionResult) {
-            // Update user's last level ROI date to prevent duplicates
+            // Update user's last level ROI processed date to prevent duplicates
+            // This marks that level ROI has been processed for this user's daily profit today
             await userDbHandler.updateByQuery(
               { _id: user._id },
               {
-                last_level_roi_date: todayIST,
-                $set: { "extra.last_level_roi_date": todayIST }
+                last_level_roi_processed_date: todayIST,
+                $set: { "extra.last_level_roi_processed_date": todayIST }
               }
             );
 
@@ -2774,6 +2825,10 @@ if (process.env.CRON_STATUS === '1') {
 
 // Test cron job removed to prevent log file creation
 
+
+
+
+
 module.exports = {
   distributeTokensHandler,
   distributeLevelIncome,
@@ -2791,5 +2846,6 @@ module.exports = {
   // Export internal functions for testing
   _processDailyTradingProfit,
   _processLevelRoiIncome,
-  _processRewardSystem
+  _processRewardSystem,
+
 };
