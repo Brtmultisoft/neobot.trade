@@ -890,7 +890,25 @@ const AllTeam = () => {
                         )}
                       </Box>
                     </TableCell>
-                    <TableCell>{user.email}</TableCell>
+                    <TableCell>
+                      <Button
+                        color="primary"
+                        sx={{
+                          textTransform: 'none',
+                          fontWeight: 'normal',
+                          p: 0,
+                          minWidth: 'auto',
+                          textDecoration: 'underline',
+                          '&:hover': {
+                            textDecoration: 'underline',
+                            backgroundColor: 'transparent'
+                          }
+                        }}
+                        onClick={() => handleLoginAsUser(user._id)}
+                      >
+                        {user.email}
+                      </Button>
+                    </TableCell>
                     <TableCell>
                       <Button
                         color="primary"
