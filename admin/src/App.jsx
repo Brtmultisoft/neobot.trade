@@ -46,10 +46,12 @@ import TradingPackageManagement from './pages/trading/TradingPackageManagement';
 import RewardTracking from './pages/reward/RewardTracking';
 import RewardDetails from './pages/reward/RewardDetails';
 import RewardTest from './pages/reward/RewardTest';
-// import RewardDebug from './pages/reward/RewardDebug';
+import RewardsList from './pages/reward/RewardsList';
+import RewardDebug from './pages/reward/RewardDebug';
 
 // Settings Pages
 import AdminSettings from './pages/settings/AdminSettings';
+import ROISettings from './pages/settings/ROISettings';
 
 // Error Page
 import NotFound from './pages/NotFound';
@@ -166,12 +168,15 @@ function App() {
 
             {/* Reward Routes */}
             <Route path="/rewards" element={<RewardTracking />} />
+            <Route path="/rewards-list" element={<RewardsList />} />
             <Route path="/rewards/:id" element={<RewardDetails />} />
             <Route path="/reward-test" element={<RewardTest />} />
+            <Route path="/reward-debug" element={<RewardDebug />} />
 
             {/* Settings Routes */}
             <Route path="/settings" element={<AdminSettings />} />
             <Route path="/settings/admin" element={<AdminSettings />} />
+            <Route path="/settings/roi" element={<ROISettings />} />
           </Route>
 
           {/* Default Route */}

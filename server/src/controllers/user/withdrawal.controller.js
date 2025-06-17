@@ -5,7 +5,8 @@ const { withdrawalDbHandler, userDbHandler, settingDbHandler } = require('../../
 const responseHelper = require('../../utils/customResponse');
 const config = require('../../config/config');
 const { userModel } = require('../../models');
-const axios = require('axios')
+const axios = require('axios');
+const withdrawalSettingsService = require('../../services/withdrawal-settings.service');
 
 const ethers = require('ethers');
 
@@ -388,9 +389,20 @@ module.exports = {
                 return responseHelper.error(res, responseData);
             }
 
-            // Calculate admin and service charge (5%)
-            const adminFee = amount * 0.05;
-            const net_amount = amount - adminFee;
+            // Get withdrawal settings and calculate fee dynamically
+            const withdrawalSettings = await withdrawalSettingsService.getWithdrawalSettings();
+
+            // Validate minimum withdrawal amount
+            const validation = await withdrawalSettingsService.validateWithdrawalAmount(amount);
+            if (!validation.valid) {
+                responseData.msg = validation.message;
+                return responseHelper.error(res, responseData);
+            }
+
+            // Calculate fee using dynamic percentage from database
+            const feeCalculation = await withdrawalSettingsService.calculateWithdrawalFee(amount);
+            const adminFee = feeCalculation.feeAmount;
+            const net_amount = feeCalculation.netAmount;
 
             // Prepare data for storage
             let data = {
@@ -402,7 +414,10 @@ module.exports = {
                 extra: {
                     walletType: 'wallet',
                     adminFee: adminFee,
-                    feePercentage: 5
+                    feePercentage: withdrawalSettings.withdrawalFeePercentage,
+                    originalAmount: amount,
+                    netAmount: net_amount,
+                    minimumWithdrawalAmount: withdrawalSettings.minimumWithdrawalAmount
                 }
             }
 
@@ -508,15 +523,19 @@ module.exports = {
                 return responseHelper.error(res, responseData);
             }
 
+            // Get withdrawal settings from database
+            const withdrawalSettings = await withdrawalSettingsService.getWithdrawalSettings();
+
             // Check minimum withdrawal amount - but only if we're actually withdrawing
-            if (stakingReleaseOption !== 'wallet' && amount < 0) {
-                responseData.msg = 'Minimum withdrawal amount is 50 USDT';
+            if (stakingReleaseOption !== 'wallet' && amount < withdrawalSettings.minimumWithdrawalAmount) {
+                responseData.msg = `Minimum withdrawal amount is $${withdrawalSettings.minimumWithdrawalAmount}`;
                 return responseHelper.error(res, responseData);
             }
 
-            // Calculate fee (10% of withdrawal amount)
-            const fee = amount * 0.1; // 10% fee
-            const netAmount = amount - fee;
+            // Calculate fee using dynamic percentage from database
+            const feeCalculation = await withdrawalSettingsService.calculateWithdrawalFee(amount);
+            const fee = feeCalculation.feeAmount;
+            const netAmount = feeCalculation.netAmount;
 
             // If we're only releasing staking to wallet or doing a partial release without withdrawal,
             // we don't need to create a withdrawal record

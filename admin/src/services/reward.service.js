@@ -139,10 +139,31 @@ const RewardService = {
       },
       bangkok_tour: {
         name: "Bangkok Tour",
-        self_invest_target: 5000,
-        direct_business_target: 10000,
+        self_invest_target: 2500,
+        direct_business_target: 5000,
         reward_value: "Bangkok Tour Package",
         color: "#FF9800"
+      },
+      coupon_code: {
+        name: "Coupon Code",
+        self_invest_target: 500,
+        direct_business_target: 800,
+        reward_value: "Special Coupon Code",
+        color: "#2196F3"
+      },
+      car_reward: {
+        name: "Car Reward",
+        self_invest_target: 10000,
+        direct_business_target: 5000,
+        reward_value: "Car (Monthly Business Required)",
+        color: "#9C27B0"
+      },
+      bike_reward: {
+        name: "Book Your Bike",
+        self_invest_target: 7000,
+        direct_business_target: 4000,
+        reward_value: "Bike Booking",
+        color: "#FF5722"
       }
     };
   },

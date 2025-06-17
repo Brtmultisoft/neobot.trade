@@ -80,7 +80,7 @@ const getAllRewards = async (req, res) => {
     console.log('Rewards fetched:', rewards.length);
 
     // Process rewards to handle missing user data
-    const processedRewards = rewards.map(reward => {
+    const processedRewards = (rewards || []).map(reward => {
       const rewardObj = reward.toObject();
 
       // If user_id is null, undefined, or just an ObjectId string, create a placeholder
@@ -112,22 +112,32 @@ const getAllRewards = async (req, res) => {
       ]);
     }
 
+    const totalPagesCalc = Math.ceil(totalRewards / parseInt(limit)) || 1;
+
     const response = {
       success: true,
-      data: {
-        rewards: processedRewards || [],
-        pagination: {
-          currentPage: parseInt(page),
-          totalPages: Math.ceil(totalRewards / parseInt(limit)) || 1,
-          totalRewards: totalRewards || 0,
-          limit: parseInt(limit)
-        },
-        statistics: stats || []
-      }
+      message: 'Rewards fetched successfully',
+      data: processedRewards || [],
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: totalPagesCalc,
+        totalRewards: totalRewards || 0,
+        limit: parseInt(limit),
+        hasNextPage: parseInt(page) < totalPagesCalc,
+        hasPrevPage: parseInt(page) > 1
+      },
+      statistics: stats || []
     };
 
-    console.log('Sending response:', JSON.stringify(response, null, 2));
-    res.status(200).json(response);
+    console.log('Sending response with', processedRewards.length, 'rewards');
+    console.log('Response structure:', {
+      success: response.success,
+      dataLength: response.data.length,
+      pagination: response.pagination,
+      statisticsLength: response.statistics.length
+    });
+
+    return res.status(200).json(response);
 
   } catch (error) {
     console.error('Error fetching rewards:', error);

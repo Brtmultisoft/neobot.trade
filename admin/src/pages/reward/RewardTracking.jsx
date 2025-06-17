@@ -83,11 +83,21 @@ const RewardTracking = () => {
       const response = await RewardService.getAllRewards(params);
       console.log('Rewards API response:', response);
 
+      // Handle null/undefined response (cancelled request or no data)
+      if (response === null || response === undefined) {
+        console.warn('API returned null/undefined response (possibly cancelled), setting empty rewards');
+        setRewards([]);
+        setTotalPages(1);
+        setTotalRewards(0);
+        return; // Don't throw error for cancelled requests
+      }
+
       if (response?.success) {
-        setRewards(response.data.rewards || []);
-        setTotalPages(response.data.pagination?.totalPages || 1);
-        setTotalRewards(response.data.pagination?.totalRewards || 0);
-        console.log('Rewards loaded successfully:', response.data.rewards?.length || 0, 'rewards');
+        const rewardsData = Array.isArray(response.data) ? response.data : [];
+        setRewards(rewardsData);
+        setTotalPages(response.pagination?.totalPages || 1);
+        setTotalRewards(response.pagination?.totalRewards || 0);
+        console.log('Rewards loaded successfully:', rewardsData.length, 'rewards');
       } else {
         console.error('API returned error:', response);
         throw new Error(response?.message || 'Failed to load rewards');
@@ -111,6 +121,12 @@ const RewardTracking = () => {
       console.log('Loading reward statistics...');
       const response = await RewardService.getRewardStatistics();
       console.log('Statistics API response:', response);
+
+      // Handle null/undefined response (cancelled request)
+      if (response === null || response === undefined) {
+        console.warn('Statistics API returned null/undefined response (possibly cancelled)');
+        return; // Don't set error for cancelled requests
+      }
 
       if (response?.success) {
         setStatistics(response.data);
@@ -188,6 +204,55 @@ const RewardTracking = () => {
     } catch (err) {
       console.error('Error triggering processing:', err);
       setError(err.message || 'Failed to trigger processing');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Seed sample rewards for testing
+  const handleSeedRewards = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const token = localStorage.getItem('admin_token');
+      console.log('Seeding rewards with token:', token ? 'Present' : 'Missing');
+
+      const response = await fetch('/api/admin/rewards/seed', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('Seed response status:', response.status);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Non-JSON response:', text);
+        throw new Error('Server returned non-JSON response');
+      }
+
+      const result = await response.json();
+      console.log('Seed result:', result);
+
+      if (result?.success) {
+        await loadRewards();
+        await loadStatistics();
+        setError(null);
+        console.log('Rewards seeded successfully:', result.message);
+      } else {
+        throw new Error(result?.message || 'Failed to seed rewards');
+      }
+    } catch (err) {
+      console.error('Error seeding rewards:', err);
+      setError(err.message || 'Failed to seed rewards');
     } finally {
       setLoading(false);
     }
@@ -332,6 +397,9 @@ const RewardTracking = () => {
                 <MenuItem value="">All Types</MenuItem>
                 <MenuItem value="goa_tour">Goa Tour</MenuItem>
                 <MenuItem value="bangkok_tour">Bangkok Tour</MenuItem>
+                <MenuItem value="coupon_code">Coupon Code</MenuItem>
+                <MenuItem value="car_reward">Car Reward</MenuItem>
+                <MenuItem value="bike_reward">Book Your Bike</MenuItem>
               </TextField>
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
@@ -372,6 +440,17 @@ const RewardTracking = () => {
                     </IconButton>
                   </span>
                 </Tooltip>
+                {totalRewards === 0 && (
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={handleSeedRewards}
+                    disabled={loading}
+                    sx={{ ml: 1 }}
+                  >
+                    Seed Test Data
+                  </Button>
+                )}
               </Stack>
             </Grid>
           </Grid>
@@ -400,8 +479,27 @@ const RewardTracking = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {rewards.map((reward) => (
-                  <TableRow key={reward._id} hover>
+                {rewards.length === 0 && !loading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} sx={{ textAlign: 'center', py: 4 }}>
+                      <Typography variant="h6" color="textSecondary" sx={{ mb: 2 }}>
+                        No Rewards Found
+                      </Typography>
+                      <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
+                        There are no rewards in the system yet. You can seed some test data to get started.
+                      </Typography>
+                      <Button
+                        variant="contained"
+                        onClick={handleSeedRewards}
+                        disabled={loading}
+                      >
+                        Seed Test Rewards
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  rewards.map((reward) => (
+                    <TableRow key={reward._id} hover>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
@@ -527,7 +625,8 @@ const RewardTracking = () => {
                       </Stack>
                     </TableCell>
                   </TableRow>
-                ))}
+                  ))
+                )}
               </TableBody>
             </Table>
           </TableContainer>

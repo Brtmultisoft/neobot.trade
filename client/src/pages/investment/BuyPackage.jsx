@@ -1194,6 +1194,11 @@ const BuyPackage = () => {
                       <Typography variant="caption" color="text.secondary">
                         per day
                       </Typography>
+                      {selectedPlan?.extra?.monthly_roi && (
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, fontStyle: 'italic' }}>
+                          (From {selectedPlan.extra.monthly_roi}% monthly)
+                        </Typography>
+                      )}
                     </Box>
                   </Grid>
 
@@ -1203,7 +1208,7 @@ const BuyPackage = () => {
                         Monthly Returns
                       </Typography>
                       <Typography variant="h5" fontWeight="bold" sx={{ color: '#0ECB81', mb: 0.5 }}>
-                        {(selectedPlan?.daily_trading_roi * 30).toFixed(1)}%
+                        {selectedPlan?.extra?.monthly_roi ? selectedPlan.extra.monthly_roi.toFixed(2) : (selectedPlan?.daily_trading_roi * 30).toFixed(1)}%
                       </Typography>
                       <Typography variant="body2" fontWeight="bold" sx={{ color: '#0ECB81' }}>
                         {formatCurrency(parseFloat(amount) * (selectedPlan?.daily_trading_roi / 100) * 30)}

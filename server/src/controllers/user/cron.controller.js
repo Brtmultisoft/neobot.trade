@@ -584,15 +584,13 @@ const processTeamCommission = async (user_id, amount) => {
       const directReferrals = await userDbHandler.getByQuery({ refer_id: currentUser._id });
       console.log(`Current upline user has ${directReferrals.length} direct referrals`);
 
-      // UPDATED: Check if user meets the direct referral requirement for this level
-      // Rule: "One direct referral per level for level income"
-      const requiredDirectReferrals = level; // Level 1 needs 1, Level 2 needs 2, etc.
-      const hasRequiredReferrals = directReferrals.length >= requiredDirectReferrals;
+      // SIMPLIFIED: Only check if user has at least 1 direct referral for any level income
+      const hasRequiredReferrals = directReferrals.length >= 1;
 
-      console.log(`Level ${level} requires ${requiredDirectReferrals} direct referrals. User has ${directReferrals.length}. Qualified: ${hasRequiredReferrals ? 'YES' : 'NO'}`);
+      console.log(`Level ${level} requires at least 1 direct referral. User has ${directReferrals.length}. Qualified: ${hasRequiredReferrals ? 'YES' : 'NO'}`);
 
       if (!hasRequiredReferrals) {
-        console.log(`❌ User ${currentUser.username || currentUser.email} does not have enough direct referrals for Level ${level}. Required: ${requiredDirectReferrals}, Has: ${directReferrals.length}. Skipping commission.`);
+        console.log(`❌ User ${currentUser.username || currentUser.email} does not have any direct referrals. Skipping commission.`);
 
         // Move to the next level (upline) without processing commission
         if (currentUser.refer_id) {
@@ -747,9 +745,9 @@ const processTeamCommission = async (user_id, amount) => {
               dailyProfitAmount: amount,
               commissionPercentage: commissionPercentage,
               directReferralsCount: directReferrals.length,
-              requiredDirectReferrals: level,
+              requiredDirectReferrals: 1,
               qualificationMet: true, // Only created if qualification is met
-              levelIncomeRule: 'One direct referral per level for level income'
+              levelIncomeRule: 'At least 1 direct referral required for level income'
             }
           });
           console.log(`Income record created: ${incomeRecord ? 'Success' : 'Failed'} (ID: ${incomeRecord?._id})`);
@@ -1820,39 +1818,131 @@ const _processDailyTradingProfit = async (triggeredBy = 'automatic') => {
 
     // Get all active investments that haven't received profit today
     // Check last_profit_date to ensure we don't give duplicate ROI
+    console.log(`[DAILY_PROFIT] Today IST date for comparison: ${todayIST.toISOString()}`);
+
+    // First, let's get all active investments to debug
+    const allActiveInvestments = await investmentDbHandler.getByQuery({ status: 'active' });
+    console.log(`[DAILY_PROFIT] Total active investments found: ${allActiveInvestments.length}`);
+
+    if (allActiveInvestments.length === 0) {
+      console.log(`[DAILY_PROFIT] ❌ No active investments found in database!`);
+      return {
+        success: true,
+        processedCount: 0,
+        totalProfit: 0,
+        cronExecutionId,
+        message: 'No active investments found'
+      };
+    }
+
+    // Log some sample investments for debugging
+    for (let i = 0; i < Math.min(3, allActiveInvestments.length); i++) {
+      const inv = allActiveInvestments[i];
+      console.log(`[DAILY_PROFIT] Sample Investment ${i + 1}: ID=${inv._id}, Amount=$${inv.amount}, LastProfit=${inv.last_profit_date || 'Never'}`);
+    }
+
+    // Get eligible investments - Simple and effective approach
+    const todayDateString = todayIST.toISOString().split('T')[0];
+    console.log(`[DAILY_PROFIT] Looking for investments that haven't received profit on: ${todayDateString}`);
+
+    // First get all active investments
     const activeInvestments = await investmentDbHandler.getByQuery({
-      status: 'active',
-      $or: [
-        { last_profit_date: { $lt: todayIST } }, // Last profit was before today (IST)
-        { last_profit_date: null }, // Never received profit
-        { last_profit_date: { $exists: false } } // Field doesn't exist
-      ]
+      status: 'active'
     });
 
-    console.log(`[DAILY_PROFIT] Found ${activeInvestments.length} active investments eligible for daily profit`);
+    console.log(`[DAILY_PROFIT] Found ${activeInvestments.length} total active investments`);
+
+    // Filter out investments that already received profit today using income records
+    const { incomeDbHandler } = require('../../services/db');
+    const todayStart = new Date(todayIST);
+    const todayEnd = new Date(todayIST.getTime() + 24 * 60 * 60 * 1000);
+
+    // Get all daily profit records for today
+    const todayProfitRecords = await incomeDbHandler.getByQuery({
+      type: 'daily_profit',
+      created_at: {
+        $gte: todayStart,
+        $lt: todayEnd
+      }
+    });
+
+    console.log(`[DAILY_PROFIT] Found ${todayProfitRecords.length} daily profit records for today`);
+
+    // Create a set of investment IDs that already received profit today
+    const processedInvestmentIds = new Set(
+      todayProfitRecords.map(record => record.investment_id?.toString()).filter(Boolean)
+    );
+
+    // Filter out already processed investments
+    const eligibleInvestments = activeInvestments.filter(investment =>
+      !processedInvestmentIds.has(investment._id.toString())
+    );
+
+    console.log(`[DAILY_PROFIT] ${eligibleInvestments.length} investments eligible for daily profit (${activeInvestments.length - eligibleInvestments.length} already processed today)`);
+
+    // STRICT: Only process investments that are truly eligible (no debugging override)
+    let investmentsToProcess = eligibleInvestments;
+
+    if (eligibleInvestments.length === 0) {
+      console.log(`[DAILY_PROFIT] ✅ No investments eligible for daily profit today (already processed or no investments)`);
+      console.log(`[DAILY_PROFIT] This is CORRECT behavior to prevent duplicate daily ROI`);
+
+      // Update cron execution record
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      await cronExecutionDbHandler.updateById(cronExecutionId, {
+        end_time: new Date(),
+        duration_ms: duration,
+        status: 'completed',
+        processed_count: 0,
+        total_amount: 0,
+        error_count: 0,
+        execution_details: {
+          total_investments: allActiveInvestments.length,
+          processed_count: 0,
+          skipped_count: allActiveInvestments.length,
+          processing_mode: 'strict_date_check',
+          message: 'No investments eligible - preventing duplicate ROI'
+        }
+      });
+
+      return {
+        success: true,
+        processedCount: 0,
+        totalProfit: 0,
+        cronExecutionId,
+        message: 'No investments eligible for daily profit today (preventing duplicates)'
+      };
+    }
+
+    console.log(`[DAILY_PROFIT] Will process ${investmentsToProcess.length} investments`);
     let processedCount = 0;
     let totalProfit = 0;
     let errors = [];
 
     // Process investments in batches to avoid memory issues
     const BATCH_SIZE = 50;
-    const totalBatches = Math.ceil(activeInvestments.length / BATCH_SIZE);
+    const totalBatches = Math.ceil(investmentsToProcess.length / BATCH_SIZE);
 
     for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
       const batchStart = batchIndex * BATCH_SIZE;
-      const batchEnd = Math.min((batchIndex + 1) * BATCH_SIZE, activeInvestments.length);
-      const currentBatch = activeInvestments.slice(batchStart, batchEnd);
+      const batchEnd = Math.min((batchIndex + 1) * BATCH_SIZE, investmentsToProcess.length);
+      const currentBatch = investmentsToProcess.slice(batchStart, batchEnd);
 
       console.log(`[DAILY_PROFIT] Processing batch ${batchIndex + 1}/${totalBatches} (${currentBatch.length} investments)`);
 
       // Process each investment in the current batch
       for (const investment of currentBatch) {
         try {
-          // Get the last profit date for reference
-          const lastProfitDate = new Date(investment.last_profit_date || investment.created_at);
+          // Investment is already pre-filtered, so it's eligible for processing
+          console.log(`[DAILY_PROFIT] ✅ Processing Investment ${investment._id} (Amount: $${investment.amount})`);
 
-          // Log the last profit date for debugging
-          console.log(`[DAILY_PROFIT] Investment ID: ${investment._id}, Last profit date: ${lastProfitDate}`);
+          // Quick safety check - this should not happen since we pre-filtered
+          if (processedInvestmentIds.has(investment._id.toString())) {
+            console.log(`[DAILY_PROFIT] ⚠️  Investment ${investment._id} was already processed today (safety check). Skipping.`);
+            continue;
+          }
 
           // Get user information
           const user = await userDbHandler.getById(investment.user_id);
@@ -1866,79 +1956,156 @@ const _processDailyTradingProfit = async (triggeredBy = 'automatic') => {
             continue;
           }
 
-          console.log(`[DAILY_PROFIT] Processing ROI for user ${user._id} (${user.email || user.username}) - Investment: ${investment._id}`);
+          console.log(`[DAILY_PROFIT] Processing ROI for user ${user._id} (${user.email || user.username}) - Investment: ${investment._id} (Amount: $${investment.amount})`);
 
-          // Get the investment plan to use its percentage value
-          const investmentPlan = await investmentPlanDbHandler.getById(investment.investment_plan_id);
-
-          // Calculate ROI rate dynamically based on stored trading package ID
+          // Calculate ROI rate with RANDOM generation between min/max for THIS SPECIFIC INVESTMENT
           let roiRate;
           let packageUsed = null;
+          let tradingPackageId = null;
+          let roiDetails = { min: 0, max: 0, generated: 0 };
 
           try {
-            let tradingPackage = null;
-
-            // First, try to get trading package from stored trading_package_id
+            // Method 1: Check if investment has stored trading_package_id
             if (investment.trading_package_id) {
-              console.log(`[DAILY_PROFIT] Found stored trading_package_id: ${investment.trading_package_id}`);
-              tradingPackage = await tradingPackageModel.findById(investment.trading_package_id);
+              console.log(`[DAILY_PROFIT] Investment has stored trading_package_id: ${investment.trading_package_id}`);
+              const tradingPackage = await tradingPackageModel.findById(investment.trading_package_id);
 
-              if (tradingPackage && tradingPackage.status && tradingPackage.daily_trading_roi) {
-                roiRate = tradingPackage.daily_trading_roi;
+              if (tradingPackage && tradingPackage.status) {
+                // Get min/max ROI from trading package or use defaults
+                const minROI = tradingPackage.min_daily_roi || tradingPackage.daily_trading_roi || 0.5;
+                const maxROI = tradingPackage.max_daily_roi || tradingPackage.daily_trading_roi || 1.0;
+
+                // Generate random ROI between min and max
+                roiRate = (Math.random() * (maxROI - minROI) + minROI);
+                roiDetails = { min: minROI, max: maxROI, generated: roiRate };
+
                 packageUsed = tradingPackage.name;
-                console.log(`[DAILY_PROFIT] Using stored trading package "${tradingPackage.name}" (ID: ${investment.trading_package_id}) with ROI: ${roiRate}%`);
+                tradingPackageId = tradingPackage._id;
+                console.log(`[DAILY_PROFIT] ✅ Using investment's stored trading package "${tradingPackage.name}"`);
+                console.log(`[DAILY_PROFIT] 🎲 Random ROI generated: ${roiRate.toFixed(3)}% (Range: ${minROI}% - ${maxROI}%)`);
               } else {
-                console.log(`[DAILY_PROFIT] Stored trading package not found or inactive (ID: ${investment.trading_package_id}), falling back to amount-based lookup`);
+                console.log(`[DAILY_PROFIT] ❌ Stored trading package not found or inactive, trying amount-based lookup`);
               }
-            } else {
-              console.log(`[DAILY_PROFIT] No trading_package_id stored for investment ${investment._id}, using amount-based lookup`);
             }
 
-            // Fallback: Find package by amount if no stored package ID or package not found
-            if (!tradingPackage || !tradingPackage.daily_trading_roi) {
-              console.log(`[DAILY_PROFIT] Looking up trading package by amount: $${investment.amount}`);
-              tradingPackage = await tradingPackageModel.findByTradingAmount(investment.amount);
+            // Method 2: Find package by this investment's specific amount
+            if (!roiRate) {
+              console.log(`[DAILY_PROFIT] Looking up trading package by this investment's amount: $${investment.amount}`);
+              const tradingPackage = await tradingPackageModel.findByTradingAmount(investment.amount);
 
-              if (tradingPackage && tradingPackage.daily_trading_roi) {
-                roiRate = tradingPackage.daily_trading_roi;
+              if (tradingPackage) {
+                // Get min/max ROI from trading package or use defaults
+                const minROI = tradingPackage.min_daily_roi || tradingPackage.daily_trading_roi || 0.5;
+                const maxROI = tradingPackage.max_daily_roi || tradingPackage.daily_trading_roi || 1.0;
+
+                // Generate random ROI between min and max
+                roiRate = (Math.random() * (maxROI - minROI) + minROI);
+                roiDetails = { min: minROI, max: maxROI, generated: roiRate };
+
                 packageUsed = tradingPackage.name + ' (Amount-based)';
-                console.log(`[DAILY_PROFIT] Found trading package by amount "${tradingPackage.name}" for $${investment.amount} with ROI: ${roiRate}%`);
+                tradingPackageId = tradingPackage._id;
+                console.log(`[DAILY_PROFIT] ✅ Found trading package by amount "${tradingPackage.name}"`);
+                console.log(`[DAILY_PROFIT] 🎲 Random ROI generated: ${roiRate.toFixed(3)}% (Range: ${minROI}% - ${maxROI}%)`);
               } else {
-                // Final fallback to static logic
-                console.log(`[DAILY_PROFIT] No trading package found by amount $${investment.amount}, using static fallback logic`);
-                if (investment.amount < 500) {
-                  roiRate = 1.0; // 1% for investments under $500
-                  packageUsed = 'Silver (Static Fallback)';
-                } else {
-                  roiRate = 1.15; // 1.15% for investments $500 and above
-                  packageUsed = 'Gold (Static Fallback)';
-                }
+                console.log(`[DAILY_PROFIT] ❌ No trading package found for amount $${investment.amount}`);
               }
             }
+
+            // Method 3: Use database settings for dynamic ROI ranges
+            if (!roiRate) {
+              console.log(`[DAILY_PROFIT] Using database settings for dynamic ROI ranges`);
+              try {
+                const { generateDynamicROI } = require('../../seeders/roi-settings.seeder');
+                const roiData = await generateDynamicROI(investment.amount);
+
+                // Convert monthly to daily and add some randomness
+                const monthlyMin = roiData.roiRanges.silverMinROI || 20;
+                const monthlyMax = roiData.roiRanges.silverMaxROI || 30;
+                if (investment.amount >= (roiData.roiRanges.amountThreshold || 5000)) {
+                  monthlyMin = roiData.roiRanges.goldMinROI || 30;
+                  monthlyMax = roiData.roiRanges.goldMaxROI || 40;
+                }
+
+                const dailyMin = monthlyMin / 30;
+                const dailyMax = monthlyMax / 30;
+
+                // Generate random ROI between min and max
+                roiRate = (Math.random() * (dailyMax - dailyMin) + dailyMin);
+                roiDetails = { min: dailyMin, max: dailyMax, generated: roiRate };
+
+                packageUsed = `${roiData.packageType} (DB Dynamic)`;
+                console.log(`[DAILY_PROFIT] ✅ Using database dynamic ROI`);
+                console.log(`[DAILY_PROFIT] 🎲 Random ROI generated: ${roiRate.toFixed(3)}% (Range: ${dailyMin.toFixed(3)}% - ${dailyMax.toFixed(3)}%)`);
+              } catch (dbError) {
+                console.error(`[DAILY_PROFIT] Error with database ROI:`, dbError);
+              }
+            }
+
+            // Method 4: Simple amount-based fallback with random ranges
+            if (!roiRate) {
+              console.log(`[DAILY_PROFIT] Using simple amount-based random ROI calculation for $${investment.amount}`);
+              let minROI, maxROI;
+
+              if (investment.amount < 5000) {
+                minROI = 0.667; // 20% monthly / 30 days
+                maxROI = 1.000; // 30% monthly / 30 days
+                packageUsed = 'Silver Package (Amount-based Default)';
+              } else {
+                minROI = 1.000; // 30% monthly / 30 days
+                maxROI = 1.333; // 40% monthly / 30 days
+                packageUsed = 'Gold Package (Amount-based Default)';
+              }
+
+              // Generate random ROI between min and max
+              roiRate = (Math.random() * (maxROI - minROI) + minROI);
+              roiDetails = { min: minROI, max: maxROI, generated: roiRate };
+
+              console.log(`[DAILY_PROFIT] ✅ Using default random ROI: ${roiRate.toFixed(3)}% (Range: ${minROI.toFixed(3)}% - ${maxROI.toFixed(3)}%) for package "${packageUsed}"`);
+            }
+
           } catch (packageError) {
             console.error(`[DAILY_PROFIT] Error fetching trading package:`, packageError);
-            // Final error fallback to static logic
-            if (investment.amount < 500) {
-              roiRate = 1.0; // 1% for investments under $500
-              packageUsed = 'Silver (Error Fallback)';
+            // Simple error fallback with random ranges
+            let minROI, maxROI;
+
+            if (investment.amount < 5000) {
+              minROI = 0.667; // 20% monthly / 30 days
+              maxROI = 1.000; // 30% monthly / 30 days
+              packageUsed = 'Silver Package (Error Fallback)';
             } else {
-              roiRate = 1.15; // 1.15% for investments $500 and above
-              packageUsed = 'Gold (Error Fallback)';
+              minROI = 1.000; // 30% monthly / 30 days
+              maxROI = 1.333; // 40% monthly / 30 days
+              packageUsed = 'Gold Package (Error Fallback)';
             }
+
+            // Generate random ROI between min and max
+            roiRate = (Math.random() * (maxROI - minROI) + minROI);
+            roiDetails = { min: minROI, max: maxROI, generated: roiRate };
+
+            console.log(`[DAILY_PROFIT] ✅ Using error fallback random ROI: ${roiRate.toFixed(3)}% (Range: ${minROI.toFixed(3)}% - ${maxROI.toFixed(3)}%) for package "${packageUsed}"`);
           }
 
-          // If investment plan has a specific percentage, log it but use trading package ROI
+          // Get the investment plan to compare with generated ROI
+          const investmentPlan = await investmentPlanDbHandler.getById(investment.investment_plan_id);
+
+          // Log comparison between investment plan percentage and generated random ROI
           if (investmentPlan && investmentPlan.percentage) {
-            console.log(`[DAILY_PROFIT] Investment plan has percentage: ${investmentPlan.percentage}%, but using trading package ROI: ${roiRate}%`);
+            console.log(`[DAILY_PROFIT] Investment plan has fixed percentage: ${investmentPlan.percentage}%, but using random trading package ROI: ${roiRate.toFixed(3)}%`);
+            console.log(`[DAILY_PROFIT] ROI Range: ${roiDetails.min.toFixed(3)}% - ${roiDetails.max.toFixed(3)}%, Generated: ${roiDetails.generated.toFixed(3)}%`);
+          } else {
+            console.log(`[DAILY_PROFIT] No investment plan percentage found, using random trading package ROI: ${roiRate.toFixed(3)}%`);
           }
 
-          console.log(`[DAILY_PROFIT] Using ROI rate: ${roiRate}% from package "${packageUsed}" for investment ${investment._id} (amount: $${investment.amount})`);
+          console.log(`[DAILY_PROFIT] 🎯 Final ROI Details for investment ${investment._id}:`);
+          console.log(`[DAILY_PROFIT] - Package: "${packageUsed}"`);
+          console.log(`[DAILY_PROFIT] - Investment Amount: $${investment.amount}`);
+          console.log(`[DAILY_PROFIT] - ROI Rate: ${roiRate.toFixed(3)}% (Min: ${roiDetails.min.toFixed(3)}%, Max: ${roiDetails.max.toFixed(3)}%)`);
 
-          // Calculate daily profit based on the investment amount and ROI rate
+          // Calculate daily profit based on the investment amount and random ROI rate
           const dailyProfit = (investment.amount * roiRate) / 100;
           totalProfit += dailyProfit;
 
-          console.log(`[DAILY_PROFIT] Processing profit for investment ${investment._id}: $${dailyProfit.toFixed(4)} (${roiRate}% of $${investment.amount})`);
+          console.log(`[DAILY_PROFIT] 💰 Daily profit calculated: $${dailyProfit.toFixed(4)} (${roiRate.toFixed(3)}% of $${investment.amount})`);
 
           // Use a transaction to ensure all operations succeed or fail together
           const session = await mongoose.startSession();
@@ -1963,23 +2130,28 @@ const _processDailyTradingProfit = async (triggeredBy = 'automatic') => {
 
             console.log(`[DAILY_PROFIT] Wallet update successful for user ${investment.user_id}`);
 
-            // Create income record
+            // Create income record with detailed tracking including random ROI details
             const incomeRecord = await incomeDbHandler.create({
               user_id: ObjectId(investment.user_id),
               investment_id: investment._id,
               type: 'daily_profit',
               amount: dailyProfit,
               status: 'credited',
-              description: 'Daily ROI',
+              description: `Daily ROI from ${packageUsed} (${roiRate.toFixed(3)}%)`,
               extra: {
                 investmentAmount: investment.amount,
                 profitPercentage: roiRate,
+                roiDetails: roiDetails, // Include min, max, and generated ROI
                 tradingPackage: packageUsed,
-                tradingPackageId: investment.trading_package_id || null,
+                tradingPackageId: tradingPackageId || investment.trading_package_id || null,
                 userCurrentPackageId: user.current_trading_package_id || null,
                 userPackageInvestmentTime: user.current_package_investment_time || null,
                 processingDate: new Date().toISOString(),
-                cronExecutionId: cronExecutionId
+                cronExecutionId: cronExecutionId,
+                investmentCreatedAt: investment.created_at,
+                lastProfitDate: investment.last_profit_date,
+                packageDetectionMethod: tradingPackageId ? 'specific_package' : 'amount_based',
+                randomROIGenerated: true
               }
             }, { session });
 
@@ -1989,10 +2161,11 @@ const _processDailyTradingProfit = async (triggeredBy = 'automatic') => {
 
             console.log(`[DAILY_PROFIT] Income record created successfully`);
 
-            // Update last profit date
+            // Update last profit date with current timestamp to prevent duplicates
+            const currentTimestamp = new Date();
             const dateUpdate = await investmentDbHandler.updateByQuery(
               { _id: investment._id },
-              { last_profit_date: todayIST },
+              { last_profit_date: currentTimestamp },
               { session }
             );
 
@@ -2000,7 +2173,7 @@ const _processDailyTradingProfit = async (triggeredBy = 'automatic') => {
               throw new Error(`Failed to update last profit date for investment ${investment._id}`);
             }
 
-            console.log(`[DAILY_PROFIT] Last profit date updated successfully`);
+            console.log(`[DAILY_PROFIT] ✅ Last profit date updated: ${currentTimestamp.toISOString()}`);
 
 
 
@@ -2080,10 +2253,10 @@ const _processDailyTradingProfit = async (triggeredBy = 'automatic') => {
       error_count: errors.length,
       error_details: errors.length > 0 ? errors : [],
       execution_details: {
-        total_investments: activeInvestments.length,
+        total_investments: investmentsToProcess.length,
         processed_count: processedCount,
-        skipped_count: activeInvestments.length - processedCount,
-        processing_mode: 'all_invested_users'
+        skipped_count: investmentsToProcess.length - processedCount,
+        processing_mode: investmentsToProcess === allActiveInvestments ? 'debug_all_active' : 'date_filtered'
       }
     });
 
@@ -2235,6 +2408,164 @@ const processDailyTradingProfit = async (req, res) => {
     return res.status(500).json({
       status: false,
       message: 'Error processing daily trading profit',
+      error: error.message
+    });
+  }
+};
+
+// API endpoint to reset last_profit_date and force daily profit
+const resetAndProcessDailyProfit = async (req, res) => {
+  try {
+    console.log("resetAndProcessDailyProfit API endpoint called");
+
+    // Check if API key is provided and valid
+    if (!req.body.key) {
+      return res.status(401).json({
+        status: false,
+        message: 'API key is required in request body'
+      });
+    }
+
+    if (req.body.key !== process.env.APP_API_KEY) {
+      return res.status(401).json({
+        status: false,
+        message: 'Invalid API key'
+      });
+    }
+
+    console.log("API key validated successfully");
+
+    // Reset last_profit_date for all active investments
+    const { investmentDbHandler } = require('../../services/db');
+    const resetResult = await investmentDbHandler.updateByQuery(
+      { status: 'active' },
+      {
+        $unset: {
+          last_profit_date: 1,
+          last_profit_processed_date: 1
+        }
+      }
+    );
+
+    console.log(`Reset last_profit_date for ${resetResult.modifiedCount || 0} investments`);
+
+    // Now run the daily profit processing
+    const result = await _processDailyTradingProfit('manual_reset');
+
+    if (result.success) {
+      return res.status(200).json({
+        status: true,
+        message: 'Reset and daily trading profit processed successfully',
+        data: {
+          resetCount: resetResult.modifiedCount || 0,
+          processedInvestments: result.processedCount,
+          totalProfit: result.totalProfit,
+          cronExecutionId: result.cronExecutionId
+        }
+      });
+    } else {
+      return res.status(500).json({
+        status: false,
+        message: 'Reset successful but daily profit processing failed',
+        data: {
+          resetCount: resetResult.modifiedCount || 0
+        },
+        error: result.error,
+        cronExecutionId: result.cronExecutionId
+      });
+    }
+  } catch (error) {
+    console.error('Error in reset and daily profit API endpoint:', error);
+    return res.status(500).json({
+      status: false,
+      message: 'Error resetting and processing daily trading profit',
+      error: error.message
+    });
+  }
+};
+
+// API endpoint to check duplicate prevention status
+const checkDuplicatePreventionStatus = async (req, res) => {
+  try {
+    console.log("checkDuplicatePreventionStatus API endpoint called");
+
+    // Check if API key is provided and valid
+    if (!req.body.key) {
+      return res.status(401).json({
+        status: false,
+        message: 'API key is required in request body'
+      });
+    }
+
+    if (req.body.key !== process.env.APP_API_KEY) {
+      return res.status(401).json({
+        status: false,
+        message: 'Invalid API key'
+      });
+    }
+
+    const { investmentDbHandler, incomeDbHandler } = require('../../services/db');
+
+    // Get today's date
+    const today = new Date();
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const todayIST = new Date(today.getTime() + istOffset);
+    todayIST.setHours(0, 0, 0, 0);
+    const todayDateString = todayIST.toISOString().split('T')[0];
+
+    // Get all active investments
+    const allActiveInvestments = await investmentDbHandler.getByQuery({ status: 'active' });
+
+    // Get investments that received profit today
+    const todayStart = new Date(todayIST);
+    const todayEnd = new Date(todayIST.getTime() + 24 * 60 * 60 * 1000);
+
+    const todayProfitRecords = await incomeDbHandler.getByQuery({
+      type: 'daily_profit',
+      created_at: {
+        $gte: todayStart,
+        $lt: todayEnd
+      }
+    });
+
+    // Get eligible investments
+    const eligibleInvestments = await investmentDbHandler.getByQuery({
+      status: 'active',
+      $and: [
+        {
+          $or: [
+            { last_profit_date: { $lt: todayIST } },
+            { last_profit_date: null },
+            { last_profit_date: { $exists: false } }
+          ]
+        },
+        {
+          $or: [
+            { last_profit_processed_date: { $ne: todayDateString } },
+            { last_profit_processed_date: null },
+            { last_profit_processed_date: { $exists: false } }
+          ]
+        }
+      ]
+    });
+
+    return res.status(200).json({
+      status: true,
+      message: 'Duplicate prevention status checked successfully',
+      data: {
+        todayDate: todayDateString,
+        totalActiveInvestments: allActiveInvestments.length,
+        eligibleForProfit: eligibleInvestments.length,
+        alreadyProcessedToday: todayProfitRecords.length,
+        duplicatePreventionWorking: (allActiveInvestments.length - eligibleInvestments.length) === todayProfitRecords.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Error in duplicate prevention status check:', error);
+    return res.status(500).json({
+      status: false,
+      message: 'Error checking duplicate prevention status',
       error: error.message
     });
   }
@@ -2837,6 +3168,8 @@ module.exports = {
   processTeamCommission,
   processActiveMemberReward,
   processDailyTradingProfit,
+  resetAndProcessDailyProfit, // New endpoint for reset and process
+  checkDuplicatePreventionStatus, // New endpoint for checking duplicate prevention
   processLevelRoiIncome,
   processUserRanks,
   processTeamRewards,

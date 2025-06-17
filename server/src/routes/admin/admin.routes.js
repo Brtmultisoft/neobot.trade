@@ -354,6 +354,10 @@ module.exports = () => {
     const cronRoutes = require('./cron.routes');
     Router.use('/cron', cronRoutes);
 
+    // ROI Settings routes
+    const roiSettingsRoutes = require('./roi-settings.routes');
+    Router.use('/settings', roiSettingsRoutes);
+
     // Reward Management routes
     Router.get("/rewards", rewardController.getAllRewards);
     Router.get("/rewards/statistics", rewardController.getRewardStatistics);
@@ -388,6 +392,71 @@ module.exports = () => {
         console.log('Trigger processing request body:', req.body);
         next();
     }, rewardController.triggerRewardProcessing);
+
+    // Health check endpoint
+    Router.get("/health", (req, res) => {
+        res.status(200).json({
+            success: true,
+            message: "Admin API is healthy",
+            timestamp: new Date().toISOString(),
+            environment: process.env.NODE_ENV || 'development'
+        });
+    });
+
+    // Debug endpoint to check database status
+    Router.get("/debug/status", adminAuthenticateMiddleware, async (req, res) => {
+        try {
+            const User = require('../../models/user.model');
+            const Reward = require('../../models/reward.model');
+
+            const userCount = await User.countDocuments();
+            const rewardCount = await Reward.countDocuments();
+
+            res.status(200).json({
+                success: true,
+                message: "Database status check",
+                data: {
+                    users: userCount,
+                    rewards: rewardCount,
+                    timestamp: new Date().toISOString()
+                }
+            });
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                message: "Database status check failed",
+                error: error.message
+            });
+        }
+    });
+
+    // Reward seeding endpoint (for testing)
+    Router.post("/rewards/seed", adminAuthenticateMiddleware, async (req, res) => {
+        try {
+            console.log('Seeding rewards endpoint called');
+
+            // Set proper headers
+            res.setHeader('Content-Type', 'application/json');
+
+            const { seedRewards } = require('../../seeders/reward.seeder');
+            console.log('Seeder function loaded, executing...');
+
+            const result = await seedRewards();
+            console.log('Seeding completed:', result);
+
+            res.status(200).json(result);
+        } catch (error) {
+            console.error('Error seeding rewards:', error);
+            console.error('Error stack:', error.stack);
+
+            res.status(500).json({
+                success: false,
+                message: 'Error seeding rewards',
+                error: error.message,
+                details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+            });
+        }
+    });
 
     /**************************
      * END OF AUTHORIZED ROUTES

@@ -8,7 +8,7 @@ const rewardSchema = new mongoose.Schema({
     },
     reward_type: {
         type: String,
-        enum: ['goa_tour', 'bangkok_tour'],
+        enum: ['goa_tour', 'bangkok_tour', 'coupon_code', 'car_reward', 'bike_reward'],
         required: true
     },
     reward_name: {
@@ -150,4 +150,5 @@ rewardSchema.pre('save', function(next) {
     next();
 });
 
-module.exports = mongoose.model('Reward', rewardSchema);
+// Check if model already exists to prevent OverwriteModelError
+module.exports = mongoose.models.Reward || mongoose.model('Reward', rewardSchema);

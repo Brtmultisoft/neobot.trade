@@ -138,4 +138,5 @@ investmentplanSchema.index({ percentage: 1 });
 investmentplanSchema.index({ status: 1, created_at: -1 });
 investmentplanSchema.index({ amount_from: 1, amount_to: 1 });
 
-module.exports = mongoose.model('InvestmentPlans', investmentplanSchema);
+// Check if model already exists to prevent OverwriteModelError
+module.exports = mongoose.models.InvestmentPlans || mongoose.model('InvestmentPlans', investmentplanSchema);

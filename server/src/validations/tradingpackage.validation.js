@@ -57,13 +57,13 @@ const tradingPackageValidation = {
 
         daily_trading_roi: Joi.number()
             .min(0.01)
-            .max(10)
+            .max(100)
             .precision(2)
             .required()
             .messages({
                 'number.base': 'Daily trading ROI must be a number',
                 'number.min': 'Daily trading ROI must be at least 0.01%',
-                'number.max': 'Daily trading ROI cannot exceed 10% for safety',
+                'number.max': 'Daily trading ROI cannot exceed 100%',
                 'any.required': 'Daily trading ROI is required'
             }),
 

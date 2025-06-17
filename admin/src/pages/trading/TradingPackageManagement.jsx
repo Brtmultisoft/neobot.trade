@@ -242,8 +242,8 @@ const TradingPackageManagement = () => {
       const roi = parseFloat(formData.daily_trading_roi);
       if (roi < 0.01) {
         validationErrors.push('Daily trading ROI must be at least 0.01%');
-      } else if (roi > 10) {
-        validationErrors.push('Daily trading ROI cannot exceed 10% for safety');
+      } else if (roi > 100) {
+        validationErrors.push('Daily trading ROI cannot exceed 100%');
       }
     }
 
@@ -851,6 +851,11 @@ const TradingPackageManagement = () => {
                 value={formData.daily_trading_roi}
                 onChange={(e) => handleInputChange('daily_trading_roi', e.target.value)}
                 required
+                helperText={
+                  formData.daily_trading_roi
+                    ? `Monthly ROI: ${(parseFloat(formData.daily_trading_roi) * 30).toFixed(2)}%`
+                    : 'Enter daily ROI percentage'
+                }
               />
             </Grid>
 
@@ -947,6 +952,9 @@ const TradingPackageManagement = () => {
                       <Typography variant="body2" color="text.secondary">Daily ROI</Typography>
                       <Typography variant="h4" fontWeight="bold" color="primary">
                         {viewPackage.daily_trading_roi}%
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        Monthly: {(viewPackage.daily_trading_roi * 30).toFixed(2)}%
                       </Typography>
                     </Box>
 
