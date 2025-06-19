@@ -20,7 +20,8 @@ import {
   People as UsersIcon,
   Place as MapPinIcon,
   Flight as PlaneIcon,
-  CheckCircle as CheckCircleIcon
+  CheckCircle as CheckCircleIcon,
+  EmojiEvents as EmojiEventsIcon
 } from '@mui/icons-material';
 import { safeUserRewardService } from '../../services/reward.service';
 
@@ -95,8 +96,6 @@ const RewardProgress = ({ userId }) => {
     }
   };
 
-
-
   const getStatusChip = (status, isQualified) => {
     if (isQualified && status === 'not_qualified') {
       return (
@@ -133,74 +132,111 @@ const RewardProgress = ({ userId }) => {
     );
   };
 
-  const RewardCard = ({ rewardType, rewardData }) => {
-    const isGoa = rewardType === 'goa_tour';
-    const primaryColor = '#F0B90B'; // Binance Gold
-    const secondaryColor = isGoa ? '#FF9800' : '#2196F3'; // Orange for Goa, Blue for Bangkok
-    const icon = isGoa ? <MapPinIcon sx={{ color: secondaryColor }} /> : <PlaneIcon sx={{ color: secondaryColor }} />;
+  const rewardTypeMeta = {
+    goa_tour: {
+      color: '#F0B90B',
+      icon: <MapPinIcon sx={{ color: '#F0B90B' }} />,
+    },
+    bangkok_tour: {
+      color: '#F0B90B',
+      icon: <PlaneIcon sx={{ color: '#F0B90B' }} />,
+    },
+    coupon_code: {
+      color: '#F0B90B',
+      icon: <DollarSignIcon sx={{ color: '#F0B90B' }} />,
+    },
+    car_reward: {
+      color: '#F0B90B',
+      icon: <EmojiEventsIcon sx={{ color: '#F0B90B' }} />,
+    },
+    bike_reward: {
+      color: '#F0B90B',
+      icon: <EmojiEventsIcon sx={{ color: '#F0B90B' }} />,
+    },
+  };
 
-    const cardGradient = isGoa
-      ? 'linear-gradient(135deg, rgba(255, 152, 0, 0.08) 0%, rgba(240, 185, 11, 0.08) 100%)'
-      : 'linear-gradient(135deg, rgba(33, 150, 243, 0.08) 0%, rgba(240, 185, 11, 0.08) 100%)';
+  const RewardCard = ({ rewardType, rewardData }) => {
+    const meta = rewardTypeMeta[rewardType] || rewardTypeMeta.goa_tour;
+    const gold = meta.color;
+    const icon = meta.icon;
+    const cardBg = '#181A20';
+    const borderColor = '#23272F';
+    const textColor = '#F5F6FA';
+    const subTextColor = '#B0BEC5';
 
     return (
       <Card sx={{
         mb: 2,
-        background: cardGradient,
-        border: `2px solid ${primaryColor}`,
-        borderRadius: 3,
-        transition: 'all 0.3s ease-in-out',
+        background: cardBg,
+        border: `1.5px solid ${borderColor}`,
+        borderRadius: 4,
+        boxShadow: '0 2px 16px #000A',
+        transition: 'all 0.3s',
+        color: textColor,
         '&:hover': {
-          transform: 'translateY(-4px)',
-          boxShadow: '0 8px 32px rgba(240, 185, 11, 0.2)',
-          borderColor: '#FCD535'
+          transform: 'translateY(-6px) scale(1.02)',
+          boxShadow: `0 8px 32px ${gold}22`,
+          borderColor: gold
         }
       }}>
         <CardContent>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Box sx={{
-                p: 1,
+                p: 1.5,
                 borderRadius: '50%',
-                background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`,
-                color: '#000',
-                boxShadow: '0 4px 16px rgba(240, 185, 11, 0.3)'
+                background: `linear-gradient(135deg, ${gold}22 0%, #23272F 100%)`,
+                color: gold,
+                boxShadow: `0 2px 8px ${gold}22`
               }}>
                 {icon}
               </Box>
-              <Typography variant="h6" sx={{ color: primaryColor, fontWeight: 600 }}>
-                {rewardData?.name || (isGoa ? 'Goa Tour' : 'Bangkok Tour')}
+              <Typography variant="h6" sx={{ color: gold, fontWeight: 700, letterSpacing: 0.5 }}>
+                {rewardData?.name}
               </Typography>
             </Box>
-            {getStatusChip(rewardData?.status, rewardData?.is_qualified)}
+            {rewardData?.is_qualified && (
+              <Chip
+                label="Qualified"
+                sx={{
+                  background: `linear-gradient(90deg, ${gold} 60%, #fff2 100%)`,
+                  color: '#181A20',
+                  fontWeight: 700,
+                  fontSize: '1rem',
+                  px: 2,
+                  boxShadow: `0 2px 8px ${gold}44`
+                }}
+              />
+            )}
+            {!rewardData?.is_qualified && getStatusChip(rewardData?.status, rewardData?.is_qualified)}
           </Box>
 
           {/* Self Investment Progress */}
-          <Box sx={{ mb: 3 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-              <Typography variant="body2" fontWeight="medium">
-                <DollarSignIcon sx={{ fontSize: 16, mr: 0.5, color: '#0ECB81' }} />
+          <Box sx={{ mb: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+              <Typography variant="body2" fontWeight="medium" sx={{ color: gold }}>
+                <DollarSignIcon sx={{ fontSize: 16, mr: 0.5, color: gold }} />
                 Self Investment
               </Typography>
-              <Typography variant="body2" sx={{ color: '#0ECB81', fontWeight: 600 }}>
-                ${rewardData?.current_self_investment?.toLocaleString() || 0} / ${rewardData?.self_invest_target?.toLocaleString() || (isGoa ? '1,000' : '5,000')}
+              <Typography variant="body2" sx={{ color: gold, fontWeight: 700 }}>
+                ${rewardData?.current_self_investment?.toLocaleString() || 0} / ${rewardData?.self_invest_target?.toLocaleString()}
               </Typography>
             </Box>
             <LinearProgress
               variant="determinate"
               value={rewardData?.self_investment_progress || 0}
               sx={{
-                height: 8,
-                borderRadius: 4,
-                backgroundColor: 'rgba(14, 203, 129, 0.1)',
+                height: 10,
+                borderRadius: 5,
+                backgroundColor: '#23272F',
                 '& .MuiLinearProgress-bar': {
-                  backgroundColor: '#0ECB81',
-                  borderRadius: 4
+                  background: `linear-gradient(90deg, ${gold} 0%, #fff2 100%)`,
+                  borderRadius: 5
                 }
               }}
             />
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="caption" sx={{ color: subTextColor }}>
                 {(rewardData?.self_investment_progress || 0).toFixed(1)}% Complete
               </Typography>
               {(rewardData?.remaining_self_investment || 0) > 0 && (
@@ -212,31 +248,31 @@ const RewardProgress = ({ userId }) => {
           </Box>
 
           {/* Direct Business Progress */}
-          <Box sx={{ mb: 3 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-              <Typography variant="body2" fontWeight="medium">
-                <UsersIcon sx={{ fontSize: 16, mr: 0.5, color: primaryColor }} />
-                Direct Business (Team Investments)
+          <Box sx={{ mb: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+              <Typography variant="body2" fontWeight="medium" sx={{ color: gold }}>
+                <UsersIcon sx={{ fontSize: 16, mr: 0.5, color: gold }} />
+                Direct Business
               </Typography>
-              <Typography variant="body2" sx={{ color: primaryColor, fontWeight: 600 }}>
-                ${rewardData?.current_direct_business?.toLocaleString() || 0} / ${rewardData?.direct_business_target?.toLocaleString() || (isGoa ? '1,500' : '10,000')}
+              <Typography variant="body2" sx={{ color: gold, fontWeight: 700 }}>
+                ${rewardData?.current_direct_business?.toLocaleString() || 0} / ${rewardData?.direct_business_target?.toLocaleString()}
               </Typography>
             </Box>
             <LinearProgress
               variant="determinate"
               value={rewardData?.direct_business_progress || 0}
               sx={{
-                height: 8,
-                borderRadius: 4,
-                backgroundColor: 'rgba(240, 185, 11, 0.1)',
+                height: 10,
+                borderRadius: 5,
+                backgroundColor: '#23272F',
                 '& .MuiLinearProgress-bar': {
-                  background: `linear-gradient(90deg, ${primaryColor} 0%, ${secondaryColor} 100%)`,
-                  borderRadius: 4
+                  background: `linear-gradient(90deg, ${gold} 0%, #fff2 100%)`,
+                  borderRadius: 5
                 }
               }}
             />
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="caption" sx={{ color: subTextColor }}>
                 {(rewardData?.direct_business_progress || 0).toFixed(1)}% Complete
               </Typography>
               {(rewardData?.remaining_direct_business || 0) > 0 && (
@@ -248,10 +284,10 @@ const RewardProgress = ({ userId }) => {
           </Box>
 
           {/* Overall Progress */}
-          <Box sx={{ pt: 2, borderTop: 1, borderColor: 'rgba(240, 185, 11, 0.2)', mb: 2 }}>
+          <Box sx={{ pt: 2, borderTop: 1, borderColor: borderColor, mb: 2 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-              <Typography variant="body2" fontWeight="medium">Overall Progress</Typography>
-              <Typography variant="body2" fontWeight="bold" sx={{ color: primaryColor }}>
+              <Typography variant="body2" fontWeight="medium" sx={{ color: textColor }}>Overall Progress</Typography>
+              <Typography variant="body2" fontWeight="bold" sx={{ color: gold }}>
                 {(rewardData?.overall_progress || 0).toFixed(1)}%
               </Typography>
             </Box>
@@ -259,16 +295,36 @@ const RewardProgress = ({ userId }) => {
               variant="determinate"
               value={rewardData?.overall_progress || 0}
               sx={{
-                height: 10,
-                borderRadius: 5,
-                backgroundColor: 'rgba(240, 185, 11, 0.1)',
+                height: 12,
+                borderRadius: 6,
+                backgroundColor: '#23272F',
                 '& .MuiLinearProgress-bar': {
-                  background: `linear-gradient(90deg, ${primaryColor} 0%, ${secondaryColor} 100%)`,
-                  borderRadius: 5
+                  background: `linear-gradient(90deg, ${gold} 0%, #fff2 100%)`,
+                  borderRadius: 6
                 }
               }}
             />
           </Box>
+
+          {/* Remarks (if any) */}
+          {rewardData?.remarks && rewardData.remarks.trim() !== '' && (
+            <Box sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              background: '#23272F',
+              borderLeft: `4px solid ${gold}`,
+              borderRadius: 2,
+              px: 2,
+              py: 1,
+              mb: 2
+            }}>
+              <EmojiEventsIcon sx={{ color: gold, fontSize: 18 }} />
+              <Typography variant="caption" sx={{ color: textColor, fontStyle: 'italic', fontWeight: 500 }}>
+                {rewardData.remarks}
+              </Typography>
+            </Box>
+          )}
 
           {/* Qualification Status */}
           {rewardData?.is_qualified && (
@@ -507,7 +563,7 @@ const RewardProgress = ({ userId }) => {
             }}
           >
             <Typography variant="body2" sx={{ mb: 1 }}>
-              🎯 <strong>Reward Qualification:</strong> Meet both self investment and direct business targets to qualify for rewards.
+              🎯 <strong>Reward Qualification:</strong> Meet either self investment or direct business targets to qualify for rewards.
             </Typography>
             <Typography variant="body2">
               💡 <strong>Direct Business Calculation:</strong> Your direct business amount is calculated from the total investments made by your direct referrals. Each person you refer who invests contributes to your direct business target.
@@ -515,18 +571,14 @@ const RewardProgress = ({ userId }) => {
           </Alert>
 
           <Grid container spacing={3}>
-            <Grid item xs={12} lg={6}>
-              <RewardCard
-                rewardType="goa_tour"
-                rewardData={rewardStatus.reward_progress?.goa_tour}
-              />
-            </Grid>
-            <Grid item xs={12} lg={6}>
-              <RewardCard
-                rewardType="bangkok_tour"
-                rewardData={rewardStatus.reward_progress?.bangkok_tour}
-              />
-            </Grid>
+            {Object.entries(rewardStatus.reward_progress || {}).map(([key, rewardData]) => (
+              <Grid item xs={12} lg={6} key={key}>
+                <RewardCard
+                  rewardType={key}
+                  rewardData={rewardData}
+                />
+              </Grid>
+            ))}
           </Grid>
         </Box>
       )}

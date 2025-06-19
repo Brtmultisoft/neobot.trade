@@ -448,7 +448,7 @@ const LevelRoiHistory = () => {
     <Box sx={{ width: '100%' }}>
       <PageHeader
         title="Level ROI Income History"
-        subtitle="View all level ROI income distributions"
+        subtitle="View all level ROI income distributions (New Rules: Level N requires N direct referrals)"
       />
 
       {/* Filters and Search */}

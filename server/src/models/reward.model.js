@@ -8,7 +8,7 @@ const rewardSchema = new mongoose.Schema({
     },
     reward_type: {
         type: String,
-        enum: ['goa_tour', 'bangkok_tour', 'coupon_code', 'car_reward', 'bike_reward'],
+      
         required: true
     },
     reward_name: {

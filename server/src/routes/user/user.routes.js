@@ -65,6 +65,7 @@ const {
 } = require("../../validations");
 
 const multerService = require('../../services/multer');
+const RewardMaster = require('../../models/reward.master.model');
 
 module.exports = () => {
 
@@ -361,6 +362,53 @@ module.exports = () => {
      * This route allows checking if OTP is enabled/disabled
      */
     Router.get('/user/otp-settings', userAuthController.getOTPSettings);
+
+    // Public GET routes for RewardMaster
+    Router.get('/get-all-reward-masters', async (req, res) => {
+        try {
+            const result = await RewardMaster.find({ active: true });
+            return res.status(200).json({
+                status: true,
+                message: 'Reward masters retrieved successfully',
+                result
+            });
+        } catch (error) {
+            return res.status(500).json({
+                status: false,
+                message: 'Failed to retrieve reward masters',
+                error: error.message
+            });
+        }
+    });
+    Router.get('/get-reward-master/:id', async (req, res) => {
+        try {
+            const { id } = req.params;
+            if (!require('mongodb').ObjectId.isValid(id)) {
+                return res.status(400).json({
+                    status: false,
+                    message: 'Invalid reward master ID'
+                });
+            }
+            const rewardMaster = await RewardMaster.findById(id);
+            if (!rewardMaster || !rewardMaster.active) {
+                return res.status(404).json({
+                    status: false,
+                    message: 'Reward master not found'
+                });
+            }
+            return res.status(200).json({
+                status: true,
+                message: 'Reward master retrieved successfully',
+                result: rewardMaster
+            });
+        } catch (error) {
+            return res.status(500).json({
+                status: false,
+                message: 'Failed to retrieve reward master',
+                error: error.message
+            });
+        }
+    });
 
     /****************************
      * END OF UNAUTHORIZED ROUTES

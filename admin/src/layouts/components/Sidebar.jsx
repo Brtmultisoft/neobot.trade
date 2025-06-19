@@ -1751,7 +1751,7 @@ const Sidebar = ({ open, onClose }) => {
               })
             }}
           >
-            <Tooltip title="Reward Tracking" placement="right" disableHoverListener={!miniVariant || isMobile}>
+            {/* <Tooltip title="Reward Tracking" placement="right" disableHoverListener={!miniVariant || isMobile}>
               <ListItemButton
                 component={Link}
                 to="/rewards"
@@ -1794,6 +1794,45 @@ const Sidebar = ({ open, onClose }) => {
                 {!miniVariant && <ListItemText primary="Reward Tracking" />}
               </ListItemButton>
             </Tooltip>
+            <Tooltip title="Reward Master List" placement="right" disableHoverListener={!miniVariant || isMobile}>
+              <ListItemButton
+                component={Link}
+                to="/reward-master-list"
+                selected={isActive('/reward-master-list')}
+                onClick={() => handleItemClick('reward-master-list')}
+                onTouchStart={() => handleTouchStart('reward-master-list')}
+                onTouchEnd={handleTouchEnd}
+                sx={{
+                  pl: miniVariant ? 1 : isMobile ? 3 : 4,
+                  borderRadius: 1,
+                  mb: 0.5,
+                  justifyContent: miniVariant ? 'center' : 'flex-start',
+                  minHeight: isMobile ? 48 : 40,
+                  ...(isMobile && {
+                    borderLeft: `3px solid ${isActive('/reward-master-list') ? theme.palette.primary.main : 'transparent'}`,
+                    transition: 'all 0.2s ease',
+                    backgroundColor: touchedItem === 'reward-master-list' ? alpha(theme.palette.primary.main, 0.15) : 'transparent',
+                  }),
+                  '&.Mui-selected': {
+                    backgroundColor: `${theme.palette.primary.main}20`,
+                    '&:hover': {
+                      backgroundColor: `${theme.palette.primary.main}30`,
+                    },
+                  },
+                }}
+              >
+                <ListItemIcon
+                  sx={{
+                    minWidth: 0,
+                    mr: miniVariant ? 0 : 2,
+                    justifyContent: 'center',
+                  }}
+                >
+                  <BusinessCenterIcon color={isActive('/reward-master-list') ? 'primary' : 'inherit'} fontSize="small" />
+                </ListItemIcon>
+                {!miniVariant && <ListItemText primary="Reward Master List" />}
+              </ListItemButton>
+            </Tooltip> */}
           </List>
         </Collapse>
 

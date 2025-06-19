@@ -454,343 +454,120 @@ const distributeGlobalAutoPoolMatrixIncome = async (user_id, amount, fromPackage
   }
 };
 
-// Process team commissions (Level ROI Income) for MLM business plan
+/**
+ * Process Level ROI Income (Team Commission) for up to 10 levels.
+ * Eligibility: User is eligible for level N ROI only if they have at least N direct referrals.
+ * - Skips users who have not invested or already received ROI for this downline today.
+ * - Uses plan/team_commission percentages if available, else defaults.
+ * @param {ObjectId} user_id - The user who received daily profit (downline)
+ * @param {number} amount - The daily profit amount
+ * @returns {Promise<boolean>} Success
+ */
 const processTeamCommission = async (user_id, amount) => {
   try {
-    console.log('\n======== PROCESSING LEVEL ROI INCOME ========');
-    console.log(`Processing level ROI income for user ID: ${user_id}, amount: $${amount}`);
-
-    // Get team commission percentages from database
+    // Get team commission percentages
     const { investmentPlanDbHandler } = require('../../services/db');
     let percentages = {};
-
     try {
-      // Get the investment plan from database
       const investmentPlan = await investmentPlanDbHandler.getOneByQuery({ status: true });
-
       if (investmentPlan && investmentPlan.team_commission) {
-        console.log('Using team commission percentages from database:', investmentPlan.team_commission);
-        // Map the database team_commission structure to level-based structure
         percentages = {
-          level1: investmentPlan.team_commission.level1 || 15,   // 15% of ROI income for level 1
-          level2: investmentPlan.team_commission.level2 || 10,   // 10% of ROI income for level 2
-          level3: investmentPlan.team_commission.level3 || 7.5,  // 7.5% of ROI income for level 3
-          level4: investmentPlan.team_commission.level4 || 5,    // 5% of ROI income for level 4
-          level5: investmentPlan.team_commission.level5 || 2.5,  // 2.5% of ROI income for level 5
-          level6: investmentPlan.team_commission.level6 || 2,    // 2% of ROI income for level 6
-          level7: investmentPlan.team_commission.level7 || 2,    // 2% of ROI income for level 7
-          level8: investmentPlan.team_commission.level8 || 2,    // 2% of ROI income for level 8
-          level9: investmentPlan.team_commission.level9 || 2,    // 2% of ROI income for level 9
-          level10: investmentPlan.team_commission.level10 || 2   // 2% of ROI income for level 10
+          level1: investmentPlan.team_commission.level1 || 15,
+          level2: investmentPlan.team_commission.level2 || 10,
+          level3: investmentPlan.team_commission.level3 || 7.5,
+          level4: investmentPlan.team_commission.level4 || 5,
+          level5: investmentPlan.team_commission.level5 || 2.5,
+          level6: investmentPlan.team_commission.level6 || 2,
+          level7: investmentPlan.team_commission.level7 || 2,
+          level8: investmentPlan.team_commission.level8 || 2,
+          level9: investmentPlan.team_commission.level9 || 2,
+          level10: investmentPlan.team_commission.level10 || 2
         };
       } else {
-        console.log('No investment plan found in database, using default percentages');
-        // Use the updated default percentages
         percentages = {
-          level1: 15,   // 15% of ROI income for level 1
-          level2: 10,   // 10% of ROI income for level 2
-          level3: 7.5,  // 7.5% of ROI income for level 3
-          level4: 5,    // 5% of ROI income for level 4
-          level5: 2.5,  // 2.5% of ROI income for level 5
-          level6: 2,    // 2% of ROI income for level 6
-          level7: 2,    // 2% of ROI income for level 7
-          level8: 2,    // 2% of ROI income for level 8
-          level9: 2,    // 2% of ROI income for level 9
-          level10: 2    // 2% of ROI income for level 10
+          level1: 15, level2: 10, level3: 7.5, level4: 5, level5: 2.5,
+          level6: 2, level7: 2, level8: 2, level9: 2, level10: 2
         };
       }
-    } catch (dbError) {
-      console.error('Error fetching investment plan from database:', dbError);
-      // Use updated default percentages
+    } catch {
       percentages = {
         level1: 15, level2: 10, level3: 7.5, level4: 5, level5: 2.5,
         level6: 2, level7: 2, level8: 2, level9: 2, level10: 2
       };
     }
 
-    console.log(`Level ROI Income percentages:
-      Level 1: ${percentages.level1 || 0}%,
-      Level 2: ${percentages.level2 || 0}%,
-      Level 3: ${percentages.level3 || 0}%,
-      Level 4: ${percentages.level4 || 0}%,
-      Level 5: ${percentages.level5 || 0}%,
-      Level 6: ${percentages.level6 || 0}%,
-      Level 7: ${percentages.level7 || 0}%,
-      Level 8: ${percentages.level8 || 0}%,
-      Level 9: ${percentages.level9 || 0}%,
-      Level 10: ${percentages.level10 || 0}%`);
-
-    // Get the user who made the investment
+    // Get the user who received profit
     const investmentUser = await userDbHandler.getById(user_id);
-    if (!investmentUser) {
-      console.error(`User not found for ID: ${user_id}`);
-      return false;
-    }
-    console.log(`Investment user: ${investmentUser.username || investmentUser.email} (ID: ${investmentUser._id})`);
-    console.log(`Investment user's refer_id: ${investmentUser.refer_id}`);
-
-    // Start with the user's referrer (level 1)
+    if (!investmentUser) return false;
     let currentUser = await userDbHandler.getById(investmentUser.refer_id);
     let level = 1;
-
-    // Process up to 10 levels as per the updated investment plan
     const maxLevel = 10;
-    console.log(`Processing up to ${maxLevel} levels of ROI income (as per updated investment plan)`);
 
     while (currentUser && level <= maxLevel) {
-      console.log(`\n--- LEVEL ${level} COMMISSION ---`);
-      console.log(`Current upline user: ${currentUser.username || currentUser.email} (ID: ${currentUser._id})`);
-      console.log(`Current upline user's refer_id: ${currentUser.refer_id}`);
-
-      // Check if the upline user has made an investment
+      // 1. Must have invested
       const hasInvested = await hasUserInvested(currentUser._id);
       if (!hasInvested) {
-        console.log(`Upline user ${currentUser.username || currentUser.email} has not made any investment. Skipping commission.`);
-
-        // Move to the next level (upline)
-        if (currentUser.refer_id) {
-          // Check if refer_id is a string 'admin' - this is a special case
-          if (currentUser.refer_id === 'admin') {
-            console.log(`Found special 'admin' refer_id. Looking up admin user...`);
-            // Try to find the admin user with ID 678f9a82a2dac325900fc47e
-            const adminUser = await userDbHandler.getOneByQuery({ _id: "678f9a82a2dac325900fc47e" });
-            if (adminUser) {
-              console.log(`Found admin user: ${adminUser.username || adminUser.email} (ID: ${adminUser._id})`);
-              currentUser = adminUser;
-            } else {
-              console.log(`Admin user not found. Breaking out of loop.`);
-              break;
-            }
-          } else {
-            // Normal case - refer_id is an ObjectId
-            const nextUser = await userDbHandler.getById(currentUser.refer_id);
-            console.log(`Moving to next level. Next upline user: ${nextUser ? (nextUser.username || nextUser.email) : 'None'} (ID: ${nextUser?._id})`);
-            if (nextUser) {
-              currentUser = nextUser;
-            } else {
-              console.log(`Next upline user not found. Breaking out of loop.`);
-              break;
-            }
-          }
-        } else {
-          console.log(`No more upline users. Breaking out of loop.`);
-          break;
-        }
+        currentUser = await getNextUpline(currentUser);
         level++;
-        continue; // Skip to the next iteration
+        continue;
       }
-
-      // Check if the user has direct referrals (REQUIRED for level income)
+      // 2. Must have enough direct referrals for this level
       const directReferrals = await userDbHandler.getByQuery({ refer_id: currentUser._id });
-      console.log(`Current upline user has ${directReferrals.length} direct referrals`);
-
-      // SIMPLIFIED: Only check if user has at least 1 direct referral for any level income
-      const hasRequiredReferrals = directReferrals.length >= 1;
-
-      console.log(`Level ${level} requires at least 1 direct referral. User has ${directReferrals.length}. Qualified: ${hasRequiredReferrals ? 'YES' : 'NO'}`);
-
-      if (!hasRequiredReferrals) {
-        console.log(`❌ User ${currentUser.username || currentUser.email} does not have any direct referrals. Skipping commission.`);
-
-        // Move to the next level (upline) without processing commission
-        if (currentUser.refer_id) {
-          if (currentUser.refer_id === 'admin') {
-            console.log(`Found special 'admin' refer_id. Looking up admin user...`);
-            const adminUser = await userDbHandler.getOneByQuery({ _id: "678f9a82a2dac325900fc47e" });
-            if (adminUser) {
-              console.log(`Found admin user: ${adminUser.username || adminUser.email} (ID: ${adminUser._id})`);
-              currentUser = adminUser;
-            } else {
-              console.log(`Admin user not found. Breaking out of loop.`);
-              break;
-            }
-          } else {
-            const nextUser = await userDbHandler.getById(currentUser.refer_id);
-            console.log(`Moving to next level. Next upline user: ${nextUser ? (nextUser.username || nextUser.email) : 'None'} (ID: ${nextUser?._id})`);
-            if (nextUser) {
-              currentUser = nextUser;
-            } else {
-              console.log(`Next upline user not found. Breaking out of loop.`);
-              break;
-            }
-          }
-        } else {
-          console.log(`No more upline users. Breaking out of loop.`);
-          break;
-        }
+      if (directReferrals.length < level) {
+        currentUser = await getNextUpline(currentUser);
         level++;
-        continue; // Skip to the next iteration
+        continue;
       }
-
-      console.log(`✅ Processing level ${level} ROI income for user with ${directReferrals.length} direct referrals (meets requirement of ${requiredDirectReferrals})`);
-
-      // Check if user has invested
-      if (hasInvested) {
-        console.log(`User has invested. Processing commission...`);
-
-        // Check if this upline user has already received level ROI from this specific downline user today
-        const today = new Date();
-        const istOffset = 5.5 * 60 * 60 * 1000;
-        const todayIST = new Date(today.getTime() + istOffset);
-        todayIST.setHours(0, 0, 0, 0);
-
-        const existingLevelRoi = await incomeDbHandler.getOneByQuery({
-          user_id: currentUser._id,
-          user_id_from: user_id,
-          type: 'level_roi_income',
-          level: level,
-          created_at: {
-            $gte: todayIST,
-            $lt: new Date(todayIST.getTime() + 24 * 60 * 60 * 1000)
-          }
-        });
-
-        if (existingLevelRoi) {
-          console.log(`❌ Level ${level} ROI already distributed from user ${user_id} to user ${currentUser._id} today. Skipping...`);
-          // Move to next level instead of skipping entirely
-          if (currentUser.refer_id) {
-            if (currentUser.refer_id === 'admin') {
-              console.log(`Found special 'admin' refer_id. Looking up admin user...`);
-              const adminUser = await userDbHandler.getOneByQuery({ _id: "678f9a82a2dac325900fc47e" });
-              if (adminUser) {
-                console.log(`Found admin user: ${adminUser.username || adminUser.email} (ID: ${adminUser._id})`);
-                currentUser = adminUser;
-              } else {
-                console.log(`Admin user not found. Breaking out of loop.`);
-                break;
-              }
-            } else {
-              const nextUser = await userDbHandler.getById(currentUser.refer_id);
-              console.log(`Moving to next level. Next upline user: ${nextUser ? (nextUser.username || nextUser.email) : 'None'} (ID: ${nextUser?._id})`);
-              if (nextUser) {
-                currentUser = nextUser;
-              } else {
-                console.log(`Next upline user not found. Breaking out of loop.`);
-                break;
-              }
-            }
-          } else {
-            console.log(`No more upline users. Breaking out of loop.`);
-            break;
-          }
-          level++;
-          continue;
-        }
-
-        // Use the actual daily profit amount directly (amount parameter is the daily profit received)
-        console.log(`Using actual daily profit amount: $${amount.toFixed(4)}`);
-
-        // Calculate commission amount based on level and actual daily profit
-        const commissionPercentage = percentages[`level${level}`];
-
-        // Check if percentage is defined for this level
-        if (commissionPercentage === undefined || commissionPercentage === null) {
-          console.log(`❌ No commission percentage defined for level ${level}. Skipping...`);
-          // Move to next level instead of breaking
-          if (currentUser.refer_id) {
-            if (currentUser.refer_id === 'admin') {
-              console.log(`Found special 'admin' refer_id. Looking up admin user...`);
-              const adminUser = await userDbHandler.getOneByQuery({ _id: "678f9a82a2dac325900fc47e" });
-              if (adminUser) {
-                console.log(`Found admin user: ${adminUser.username || adminUser.email} (ID: ${adminUser._id})`);
-                currentUser = adminUser;
-              } else {
-                console.log(`Admin user not found. Breaking out of loop.`);
-                break;
-              }
-            } else {
-              const nextUser = await userDbHandler.getById(currentUser.refer_id);
-              console.log(`Moving to next level. Next upline user: ${nextUser ? (nextUser.username || nextUser.email) : 'None'} (ID: ${nextUser?._id})`);
-              if (nextUser) {
-                currentUser = nextUser;
-              } else {
-                console.log(`Next upline user not found. Breaking out of loop.`);
-                break;
-              }
-            }
-          } else {
-            console.log(`No more upline users. Breaking out of loop.`);
-            break;
-          }
-          level++;
-          continue;
-        }
-
-        const commissionAmount = (amount * commissionPercentage) / 100;
-        console.log(`Commission percentage: ${commissionPercentage}%`);
-        console.log(`Commission amount: $${commissionAmount.toFixed(4)} (${commissionPercentage}% of $${amount.toFixed(4)})`);
-
-        // Process commission
-        try {
-          // Add commission to user's wallet
-          const walletUpdate = await userDbHandler.updateOneByQuery({_id: currentUser._id}, {
-            $inc: {
-              wallet: commissionAmount,
-              "extra.teamCommission": commissionAmount
-            }
-          });
-          console.log(`Wallet update result: ${walletUpdate ? 'Success' : 'Failed'}`);
-
-          // Create income record
-          const incomeRecord = await incomeDbHandler.create({
-            user_id: ObjectId(currentUser._id),
-            user_id_from: ObjectId(user_id),
-            type: 'level_roi_income',
-            amount: commissionAmount,
-            status: 'credited',
-            level: level,
-            description: `Level ${level} ROI Income`,
-            extra: {
-              fromUser: investmentUser.username || investmentUser.email,
-              dailyProfitAmount: amount,
-              commissionPercentage: commissionPercentage,
-              directReferralsCount: directReferrals.length,
-              requiredDirectReferrals: 1,
-              qualificationMet: true, // Only created if qualification is met
-              levelIncomeRule: 'At least 1 direct referral required for level income'
-            }
-          });
-          console.log(`Income record created: ${incomeRecord ? 'Success' : 'Failed'} (ID: ${incomeRecord?._id})`);
-        } catch (updateError) {
-          console.error(`Error updating wallet or creating income record: ${updateError.message}`);
-        }
-      } else {
-        console.log(`User ${currentUser.username || currentUser.email} has not invested. Skipping commission.`);
+      // 3. Must not have already received this level ROI from this downline today
+      const today = new Date();
+      const istOffset = 5.5 * 60 * 60 * 1000;
+      const todayIST = new Date(today.getTime() + istOffset);
+      todayIST.setHours(0, 0, 0, 0);
+      const existingLevelRoi = await incomeDbHandler.getOneByQuery({
+        user_id: currentUser._id,
+        user_id_from: user_id,
+        type: 'level_roi_income',
+        level: level,
+        created_at: { $gte: todayIST, $lt: new Date(todayIST.getTime() + 24 * 60 * 60 * 1000) }
+      });
+      if (existingLevelRoi) {
+        currentUser = await getNextUpline(currentUser);
+        level++;
+        continue;
       }
-
-      // Move to the next level (upline)
-      if (currentUser.refer_id) {
-        // Check if refer_id is a string 'admin' - this is a special case
-        if (currentUser.refer_id === 'admin') {
-          console.log(`Found special 'admin' refer_id. Looking up admin user...`);
-          // Try to find the admin user with ID 678f9a82a2dac325900fc47e
-          const adminUser = await userDbHandler.getOneByQuery({ _id: "678f9a82a2dac325900fc47e" });
-          if (adminUser) {
-            console.log(`Found admin user: ${adminUser.username || adminUser.email} (ID: ${adminUser._id})`);
-            currentUser = adminUser;
-          } else {
-            console.log(`Admin user not found. Breaking out of loop.`);
-            break;
-          }
-        } else {
-          // Normal case - refer_id is an ObjectId
-          const nextUser = await userDbHandler.getById(currentUser.refer_id);
-          console.log(`Moving to next level. Next upline user: ${nextUser ? (nextUser.username || nextUser.email) : 'None'} (ID: ${nextUser?._id})`);
-          if (nextUser) {
-            currentUser = nextUser;
-          } else {
-            console.log(`Next upline user not found. Breaking out of loop.`);
-            break;
-          }
-        }
-      } else {
-        console.log(`No more upline users. Breaking out of loop.`);
-        break;
+      // 4. Calculate and credit commission
+      const commissionPercentage = percentages[`level${level}`];
+      if (!commissionPercentage) {
+        currentUser = await getNextUpline(currentUser);
+        level++;
+        continue;
       }
+      const commissionAmount = (amount * commissionPercentage) / 100;
+      await userDbHandler.updateOneByQuery(
+        { _id: currentUser._id },
+        { $inc: { wallet: commissionAmount, "extra.teamCommission": commissionAmount } }
+      );
+      await incomeDbHandler.create({
+        user_id: ObjectId(currentUser._id),
+        user_id_from: ObjectId(user_id),
+        type: 'level_roi_income',
+        amount: commissionAmount,
+        status: 'credited',
+        level: level,
+        description: `Level ${level} ROI Income`,
+        extra: {
+          fromUser: investmentUser.username || investmentUser.email,
+          dailyProfitAmount: amount,
+          commissionPercentage,
+          directReferralsCount: directReferrals.length,
+          requiredDirectReferrals: level,
+          qualificationMet: true,
+          levelIncomeRule: `Level ${level} requires at least ${level} direct referrals. User has ${directReferrals.length}.`
+        }
+      });
+      currentUser = await getNextUpline(currentUser);
       level++;
     }
-
-    console.log('======== LEVEL ROI INCOME PROCESSING COMPLETE ========\n');
     return true;
   } catch (error) {
     console.error('Error processing team commission:', error);
@@ -798,463 +575,14 @@ const processTeamCommission = async (user_id, amount) => {
   }
 };
 
-// Process user ranks based on trade balance and active team
-const _processUserRanks = async () => {
-  try {
-    console.log('\n======== PROCESSING USER RANKS ========');
-
-    // Get all ranks ordered by min_trade_balance (highest to lowest)
-    const ranks = await rankDbHandler.getByQuery({}, {}).sort({ min_trade_balance: -1 });
-    console.log(`Found ${ranks.length} ranks in the database:`);
-    ranks.forEach(rank => {
-      console.log(`- ${rank.name}: Min Investment $${rank.min_trade_balance}, Team Size ${rank.active_team}, Trade Booster ${rank.trade_booster}%`);
-    });
-
-    // Get all users
-    const users = await userDbHandler.getByQuery({});
-    console.log(`Processing ranks for ${users.length} users`);
-
-    let updatedCount = 0;
-    let unchangedCount = 0;
-
-    for (const user of users) {
-      console.log(`\n--- PROCESSING USER: ${user.username || user.email} ---`);
-
-      // Get user's direct referrals
-      const directReferrals = await userDbHandler.getByQuery({ refer_id: user._id });
-
-      // Filter to only include active direct referrals (those who have invested)
-      const activeDirectReferrals = directReferrals.filter(ref => ref.total_investment > 0);
-      const activeTeamCount = activeDirectReferrals.length;
-
-      console.log(`User details:`);
-      console.log(`- ID: ${user._id}`);
-      console.log(`- Total investment: $${user.total_investment}`);
-      console.log(`- Total direct referrals: ${directReferrals.length}`);
-      console.log(`- Active direct referrals: ${activeTeamCount}`);
-      console.log(`- Current rank: ${user.rank}`);
-      console.log(`- Current trade booster: ${user.trade_booster}%`);
-      console.log(`- Current level ROI income: ${user.level_roi_income}`);
-      console.log(`- Current daily limit view: ${user.daily_limit_view}`);
-
-      if (directReferrals.length > 0) {
-        console.log(`Direct referrals (active ones have investments > $0):`);
-        directReferrals.forEach((ref, index) => {
-          const isActive = ref.total_investment > 0;
-          console.log(`  ${index + 1}. ${ref.username || ref.email} (Investment: $${ref.total_investment}) - ${isActive ? 'ACTIVE' : 'INACTIVE'}`);
-        });
-      }
-
-      // Find the highest rank the user qualifies for based on investment and team size
-      // Start from highest rank and work down
-      let newRank = 'ACTIVE'; // Default rank
-      let qualifiedRank = null;
-
-      console.log(`\nChecking rank qualifications:`);
-
-      // Always use hardcoded ranks to ensure consistency
-      console.log('Using hardcoded ranks for reliable rank calculation');
-      const sortedRanks = [
-        {
-          name: 'SUPREME',
-          min_trade_balance: 20000,
-          active_team: 60,
-          daily_limit_view: 5,
-          trade_booster: 4.5,
-          level_roi_income: 5
-        },
-        {
-          name: 'ROYAL',
-          min_trade_balance: 5000,
-          active_team: 22,
-          daily_limit_view: 4,
-          trade_booster: 4.0,
-          level_roi_income: 3
-        },
-        {
-          name: 'VETERAM',
-          min_trade_balance: 2000,
-          active_team: 11,
-          daily_limit_view: 3,
-          trade_booster: 3.5,
-          level_roi_income: 2
-        },
-        {
-          name: 'PRIME',
-          min_trade_balance: 500,
-          active_team: 5,
-          daily_limit_view: 2,
-          trade_booster: 3.0,
-          level_roi_income: 1
-        },
-        {
-          name: 'ACTIVE',
-          min_trade_balance: 50,
-          active_team: 0,
-          daily_limit_view: 1,
-          trade_booster: 2.5,
-          level_roi_income: 0
-        }
-      ];
-
-      // Log each rank for debugging
-      console.log(`Using ${sortedRanks.length} hardcoded ranks:`);
-      sortedRanks.forEach(rank => {
-        console.log(`Rank: ${rank.name}, Min Trade Balance: $${rank.min_trade_balance}, Active Team: ${rank.active_team}, Trade Booster: ${rank.trade_booster}%`);
-      });
-
-      // Loop through ranks from highest to lowest
-      for (const rank of sortedRanks) {
-        console.log(`- ${rank.name}: `);
-        console.log(`  Required investment: $${rank.min_trade_balance} (User has: $${user.total_investment}) - ${user.total_investment >= rank.min_trade_balance ? 'PASS' : 'FAIL'}`);
-        console.log(`  Required team size: ${rank.active_team} (User has: ${activeTeamCount}) - ${activeTeamCount >= rank.active_team ? 'PASS' : 'FAIL'}`);
-
-        // Check if user meets the investment and team size requirements
-        if (user.total_investment >= rank.min_trade_balance && activeTeamCount >= rank.active_team) {
-          qualifiedRank = rank;
-          newRank = rank.name;
-          console.log(`  RESULT: User qualifies for rank ${newRank}`);
-          break; // Found the highest rank, exit loop
-        } else {
-          console.log(`  RESULT: User does not qualify for rank ${rank.name}`);
-        }
-      }
-
-      // If no rank was found, use ACTIVE as default
-      if (!qualifiedRank) {
-        console.log(`User does not qualify for any rank, using default: ACTIVE`);
-        qualifiedRank = await rankDbHandler.getOneByQuery({ name: 'ACTIVE' });
-      }
-
-      // Enhanced debugging for all users
-      console.log(`\n*** DETAILED RANK QUALIFICATION INFO ***`);
-      console.log(`Email: ${user.email}`);
-      console.log(`ID: ${user._id}`);
-      console.log(`Total investment: $${user.total_investment}`);
-      console.log(`Direct referrals: ${activeTeamCount}`);
-      console.log(`Current rank: ${user.rank}`);
-      console.log(`Qualified for rank: ${newRank}`);
-      console.log(`Qualified rank details: ${qualifiedRank ? JSON.stringify(qualifiedRank) : 'None'}`);
-
-      // Always check if user meets requirements for any rank, regardless of current rank
-      // This ensures we update users who qualify for higher ranks
-      const shouldUpdate = true; // Always evaluate rank updates
-
-      if (shouldUpdate) {
-        // Get the rank details directly from the hardcoded ranks
-        console.log(`Getting rank details for ${newRank} from hardcoded ranks`);
-        let rankDetails = sortedRanks.find(rank => rank.name === newRank);
-
-        if (!rankDetails) {
-          console.log(`ERROR: Rank details not found for ${newRank} in hardcoded ranks, using ACTIVE as fallback`);
-          rankDetails = {
-            name: 'ACTIVE',
-            min_trade_balance: 50,
-            active_team: 0,
-            daily_limit_view: 1,
-            trade_booster: 2.5,
-            level_roi_income: 0
-          };
-        }
-
-        console.log(`Using rank details for ${newRank}:`, rankDetails);
-
-        console.log(`\nUpdating user ${user.username || user.email}:`);
-        console.log(`- From rank: ${user.rank} to ${newRank}`);
-        console.log(`- From trade booster: ${user.trade_booster}% to ${rankDetails.trade_booster}%`);
-        console.log(`- From level ROI income: ${user.level_roi_income} to ${rankDetails.level_roi_income}`);
-        console.log(`- From daily limit view: ${user.daily_limit_view} to ${rankDetails.daily_limit_view}`);
-
-        // Use direct MongoDB update to ensure it works
-        try {
-          // First try with updateById
-          const updateResult = await userDbHandler.updateByQuery({_id: user._id}, {
-            rank: newRank,
-            trade_booster: rankDetails.trade_booster,
-            level_roi_income: rankDetails.level_roi_income,
-            daily_limit_view: rankDetails.daily_limit_view,
-            rank_benefits_active: true // Ensure rank benefits are active
-          });
-
-          console.log(`Update result: ${updateResult ? 'Success' : 'Failed'}`);
-
-          // If update didn't work, try with direct MongoDB update
-          if (!updateResult) {
-            console.log('First update method failed, trying direct MongoDB update');
-            const mongoose = require('mongoose');
-            const User = mongoose.model('Users');
-
-            const directUpdate = await User.findByIdAndUpdate(
-              user._id,
-              {
-                $set: {
-                  rank: newRank,
-                  trade_booster: rankDetails.trade_booster,
-                  level_roi_income: rankDetails.level_roi_income,
-                  daily_limit_view: rankDetails.daily_limit_view,
-                  rank_benefits_active: true
-                }
-              },
-              { new: true }
-            );
-
-            console.log('Direct update result:', directUpdate ? 'Success' : 'Failed');
-            if (directUpdate) {
-              console.log(`Updated user rank to ${directUpdate.rank} with trade booster ${directUpdate.trade_booster}%`);
-            }
-          }
-
-          updatedCount++;
-        } catch (updateError) {
-          console.error('Error during update:', updateError);
-        }
-      } else {
-        console.log(`No rank change needed for user ${user.username || user.email}`);
-        unchangedCount++;
-      }
-    }
-
-    console.log(`\n======== USER RANK PROCESSING COMPLETE ========`);
-    console.log(`Updated ${updatedCount} users, ${unchangedCount} users unchanged`);
-
-    return { success: true, message: 'User ranks updated successfully', updatedCount, unchangedCount };
-  } catch (error) {
-    console.error('Failed to update user ranks with error::', error);
-    return { success: false, message: 'Failed to update user ranks', error };
+// Helper to get next upline user (handles 'admin' refer_id)
+async function getNextUpline(user) {
+  if (!user.refer_id) return null;
+  if (user.refer_id === 'admin') {
+    return await userDbHandler.getOneByQuery({ _id: "678f9a82a2dac325900fc47e" });
   }
-};
-
-// API endpoint for processing user ranks
-const processUserRanks = async (req, res) => {
-  try {
-    console.log("Processing user ranks...");
-    console.log("Request body:", req.body);
-
-    // Check if API key is provided and valid
-    if (!req.body.key) {
-      console.error("API key not provided in request body");
-      return res.status(401).json({
-        status: false,
-        message: 'API key is required in request body'
-      });
-    }
-
-    if (req.body.key !== process.env.APP_API_KEY) {
-      console.error("Invalid API key provided");
-      return res.status(401).json({
-        status: false,
-        message: 'Invalid API key'
-      });
-    }
-
-    // console.log("API key validated successfully");
-    const result = await _processUserRanks();
-
-    if (result.success) {
-      return res.status(200).json({
-        status: true,
-        message: 'User ranks processed successfully',
-        updatedCount: result.updatedCount,
-        unchangedCount: result.unchangedCount
-      });
-    } else {
-      return res.status(500).json({
-        status: false,
-        message: 'Failed to process user ranks',
-        error: result.error
-      });
-    }
-  } catch (error) {
-    console.error('Error in user ranks API endpoint:', error);
-    return res.status(500).json({
-      status: false,
-      message: 'Error processing user ranks',
-      error: error.message
-    });
-  }
-};
-
-// Process team rewards based on team deposit and time period
-const _processTeamRewards = async () => {
-  try {
-    // Team reward tiers
-    const teamRewardTiers = [
-      { team_deposit: 100000, time_period: 30, reward_amount: 15000 },
-      { team_deposit: 300000, time_period: 60, reward_amount: 50000 },
-      { team_deposit: 1200000, time_period: 90, reward_amount: 500000 }
-    ];
-
-    // Get all users
-    const users = await userDbHandler.getByQuery({});
-    console.log(`Processing team rewards for ${users.length} users`);
-
-    for (const user of users) {
-      console.log(`\n--- PROCESSING USER: ${user.username || user.email} (ID: ${user._id}) ---`);
-
-      // Get user's team (all referrals in their downline)
-      const directReferrals = await userDbHandler.getByQuery({ refer_id: user._id });
-      console.log(`User has ${directReferrals.length} direct referrals`);
-
-      // Filter to only include active direct referrals (those who have invested)
-      const activeDirectReferrals = directReferrals.filter(ref => ref.total_investment > 0);
-      console.log(`User has ${activeDirectReferrals.length} ACTIVE direct referrals (with investments)`);
-
-      if (activeDirectReferrals.length > 0) {
-        console.log(`Active direct referrals:`);
-        activeDirectReferrals.forEach((ref, index) => {
-          console.log(`  ${index + 1}. ${ref.username || ref.email} (Investment: $${ref.total_investment})`);
-        });
-      }
-
-      // Calculate total team deposit
-      let totalTeamDeposit = 0;
-      let activeTeamDeposit = 0;
-
-      // Count direct referrals' investments
-      for (const referral of directReferrals) {
-        totalTeamDeposit += referral.total_investment;
-        if (referral.total_investment > 0) {
-          activeTeamDeposit += referral.total_investment;
-        }
-
-        // Get indirect referrals (level 2)
-        const indirectReferrals = await userDbHandler.getByQuery({ refer_id: referral._id });
-        console.log(`Direct referral ${referral.username || referral.email} has ${indirectReferrals.length} indirect referrals`);
-
-        // Filter to only include active indirect referrals
-        const activeIndirectReferrals = indirectReferrals.filter(ref => ref.total_investment > 0);
-
-        // Count indirect referrals' investments
-        for (const indirectReferral of indirectReferrals) {
-          totalTeamDeposit += indirectReferral.total_investment;
-          if (indirectReferral.total_investment > 0) {
-            activeTeamDeposit += indirectReferral.total_investment;
-          }
-        }
-      }
-
-      console.log(`Total team deposit: $${totalTeamDeposit}`);
-      console.log(`Active team deposit: $${activeTeamDeposit}`);
-
-      // Check if user qualifies for any team reward
-      console.log(`\nChecking team reward qualification:`);
-      console.log(`Team reward tiers:`);
-      teamRewardTiers.forEach((tier, index) => {
-        console.log(`Tier ${index + 1}: $${tier.team_deposit} team deposit → $${tier.reward_amount} reward after ${tier.time_period} days`);
-      });
-
-      // Use active team deposit for qualification
-      const depositToUse = activeTeamDeposit;
-      console.log(`Using active team deposit ($${depositToUse}) for qualification`);
-
-      for (const tier of teamRewardTiers) {
-        console.log(`\nChecking tier: $${tier.team_deposit} team deposit requirement`);
-        console.log(`User's active team deposit: $${depositToUse}`);
-        console.log(`Qualification status: ${depositToUse >= tier.team_deposit ? 'QUALIFIED' : 'NOT QUALIFIED'}`);
-
-        if (depositToUse >= tier.team_deposit) {
-          console.log(`User qualifies for $${tier.reward_amount} reward after ${tier.time_period} days`);
-
-          // Check if user already has an active team reward of this tier
-          const existingReward = await teamRewardDbHandler.getOneByQuery({
-            user_id: user._id,
-            team_deposit: tier.team_deposit,
-            status: { $in: ['pending', 'completed'] }
-          });
-
-          console.log(`User already has this reward: ${existingReward ? 'YES' : 'NO'}`);
-
-          if (!existingReward) {
-            console.log(`Creating new team reward for user`);
-
-            // Create new team reward
-            const endDate = new Date();
-            endDate.setDate(endDate.getDate() + tier.time_period);
-            console.log(`Reward start date: ${new Date().toISOString()}`);
-            console.log(`Reward end date: ${endDate.toISOString()}`);
-
-            const newReward = {
-              user_id: user._id,
-              team_deposit: tier.team_deposit,
-              time_period: tier.time_period,
-              reward_amount: tier.reward_amount,
-              start_date: new Date(),
-              end_date: endDate,
-              status: 'pending',
-              remarks: `Team deposit of $${tier.team_deposit} achieved. Reward will be processed after ${tier.time_period} days.`
-            };
-
-            try {
-              const createdReward = await teamRewardDbHandler.create(newReward);
-              console.log(`Team reward created successfully: ${createdReward ? 'YES' : 'NO'}`);
-              if (createdReward) {
-                console.log(`Reward ID: ${createdReward._id}`);
-              }
-              log.info(`Created new team reward for user ${user.username || user.email}`);
-            } catch (rewardError) {
-              console.error(`Error creating team reward: ${rewardError.message}`);
-            }
-          } else {
-            console.log(`Skipping reward creation - user already has an active reward of this tier`);
-            console.log(`Existing reward status: ${existingReward.status}`);
-            console.log(`Existing reward end date: ${existingReward.end_date}`);
-          }
-        } else {
-          console.log(`User does not qualify for this tier`);
-        }
-      }
-    }
-
-    // Process completed team rewards
-    const pendingRewards = await teamRewardDbHandler.getByQuery({
-      status: 'pending',
-      end_date: { $lte: new Date() }
-    });
-
-    for (const reward of pendingRewards) {
-      // Create income entry for the reward
-      const hasInvested = await hasUserInvested(reward.user_id);
-      if(hasInvested) {
-        // Get user info
-        const user = await userDbHandler.getById(reward.user_id);
-
-        const incomeData = {
-          user_id: reward.user_id,
-          type: 'team_reward',
-          amount: reward.reward_amount,
-          status: 'credited',
-          description: `Team reward for maintaining $${reward.team_deposit} team deposit for ${reward.time_period} days`,
-          extra: {
-            team_deposit: reward.team_deposit,
-            time_period: reward.time_period
-          }
-        };
-
-        await incomeDbHandler.create(incomeData);
-
-        // Update user's wallet
-        await userDbHandler.updateByQuery({_id: reward.user_id}, {
-          $inc: {
-            wallet: reward.reward_amount
-          }
-        });
-
-        // Update reward status
-        await teamRewardDbHandler.updateById(reward._id, {
-          status: 'completed',
-          remarks: `Reward of $${reward.reward_amount} credited to wallet`
-        });
-
-        log.info(`Processed team reward for user ${user ? (user.username || user.email) : reward.user_id}`);
-      }
-    }
-
-    return { success: true, message: 'Team rewards processed successfully' };
-  } catch (error) {
-    log.error('Failed to process team rewards with error::', error);
-    return { success: false, message: 'Failed to process team rewards', error };
-  }
-};
+  return await userDbHandler.getById(user.refer_id);
+}
 
 // Process active member rewards
 const _processActiveMemberReward = async () => {
@@ -1513,18 +841,20 @@ const _checkAndFixPendingActivations = async () => {
   }
 };
 
-// Process Level ROI Income (Team Commission) for all users - runs at 1:00 AM UTC
-// Processes level ROI for all users who received daily profit today
-// Prevents duplicate processing using last_level_roi_date field
+/**
+ * Processes Level ROI Income for all users who received daily profit today.
+ * - Prevents duplicate processing using last_level_roi_processed_date.
+ * - Groups daily profits by user and processes team commissions.
+ * - Logs execution and errors, and updates cron execution records.
+ * @param {string} triggeredBy - Source of trigger ('automatic', 'manual', etc.)
+ * @returns {Promise<Object>} Result summary
+ */
 const _processLevelRoiIncome = async (triggeredBy = 'automatic') => {
-  // Create a cron execution record
   let cronExecutionId = null;
   const startTime = Date.now();
 
   try {
     console.log(`[LEVEL_ROI] Starting level ROI processing at ${new Date().toISOString()}`);
-
-    // Create a cron execution record
     const { cronExecutionDbHandler } = require('../../services/db');
     const cronExecution = await cronExecutionDbHandler.create({
       cron_name: 'level_roi',
@@ -1537,35 +867,26 @@ const _processLevelRoiIncome = async (triggeredBy = 'automatic') => {
         nodeVersion: process.version
       }
     });
-
     cronExecutionId = cronExecution._id;
-    console.log(`[LEVEL_ROI] Created cron execution record with ID: ${cronExecutionId}`);
 
-    // Set today's date for processing using IST
+    // Set today's date in IST
     const today = new Date();
-    // Convert to IST (UTC+5:30)
     const istOffset = 5.5 * 60 * 60 * 1000;
     const todayIST = new Date(today.getTime() + istOffset);
     todayIST.setHours(0, 0, 0, 0);
+    const todayEndIST = new Date(todayIST.getTime() + 24 * 60 * 60 * 1000);
 
     // Get all income records from today's daily profit processing
-    // This ensures we only process level ROI for users who actually received daily profit today
     const { incomeDbHandler } = require('../../services/db');
     const todaysDailyProfits = await incomeDbHandler.getByQuery({
       type: 'daily_profit',
-      created_at: {
-        $gte: todayIST,
-        $lt: new Date(todayIST.getTime() + 24 * 60 * 60 * 1000)
-      },
+      created_at: { $gte: todayIST, $lt: todayEndIST },
       status: 'credited'
     });
+    console.log(`[LEVEL_ROI] Found ${todaysDailyProfits.length} daily profit records from today`);
 
-    console.log(`[LEVEL_ROI] Found ${todaysDailyProfits.length} daily profit records from today` ,{todaysDailyProfits});
-
-    if (todaysDailyProfits.length === 0) {
+    if (!todaysDailyProfits.length) {
       console.log('[LEVEL_ROI] No daily profit records found for today. Skipping level ROI processing.');
-
-      // Update cron execution record
       await cronExecutionDbHandler.updateById(cronExecutionId, {
         end_time: new Date(),
         duration_ms: Date.now() - startTime,
@@ -1577,7 +898,6 @@ const _processLevelRoiIncome = async (triggeredBy = 'automatic') => {
           processing_mode: 'all_invested_users'
         }
       });
-
       return {
         success: true,
         processedCount: 0,
@@ -1589,10 +909,10 @@ const _processLevelRoiIncome = async (triggeredBy = 'automatic') => {
 
     let processedCount = 0;
     let totalCommission = 0;
-    let errors = [];
+    const errors = [];
     let skippedCount = 0;
 
-    // Group daily profits by user to avoid processing the same user multiple times
+    // Group daily profits by user
     const userProfitMap = new Map();
     for (const profit of todaysDailyProfits) {
       const userId = profit.user_id.toString();
@@ -1607,68 +927,42 @@ const _processLevelRoiIncome = async (triggeredBy = 'automatic') => {
       userProfit.total_profit += profit.amount;
       userProfit.profit_records.push(profit);
     }
-
     console.log(`[LEVEL_ROI] Found ${userProfitMap.size} unique users who received daily profit today`);
 
-    // Process level ROI income for each user who received daily profit today
+    // Process level ROI income for each user
     for (const [userId, userProfitData] of userProfitMap) {
       try {
-        console.log(`[LEVEL_ROI] Processing level ROI for user: ${userId}`);
-
-        // Get user information
         const user = await userDbHandler.getById(userProfitData.user_id);
         if (!user) {
-          console.error(`[LEVEL_ROI] User not found for ID ${userId}. Skipping...`);
-          errors.push({
-            user_id: userId,
-            error: 'User not found'
-          });
+          errors.push({ user_id: userId, error: 'User not found' });
           continue;
         }
-
-        console.log(`[LEVEL_ROI] Processing level ROI for user: ${user.username || user.email} (ID: ${user._id})`);
-        console.log(`[LEVEL_ROI] User's total daily profit today: $${userProfitData.total_profit.toFixed(4)}`);
-
-        // Check if level ROI has already been processed for this user today to prevent duplicates
-        // Note: We check if this specific user has already triggered level ROI processing today
+        // Prevent duplicate processing
         const lastLevelRoiProcessedDate = user.last_level_roi_processed_date || user.extra?.last_level_roi_processed_date;
         if (lastLevelRoiProcessedDate) {
           const lastProcessedDate = new Date(lastLevelRoiProcessedDate);
           lastProcessedDate.setHours(0, 0, 0, 0);
-
           if (lastProcessedDate.getTime() === todayIST.getTime()) {
-            console.log(`[LEVEL_ROI] Level ROI already processed for user ${userId} today. Skipping...`);
             skippedCount++;
             continue;
           }
         }
-
         // Check if user has made an investment
         const hasInvested = await hasUserInvested(user._id);
         if (!hasInvested) {
-          console.log(`[LEVEL_ROI] User ${user._id} has not made any investment. Skipping level ROI income...`);
           skippedCount++;
           continue;
         }
-
         // Use the total profit amount for level ROI calculation
         const profitAmount = userProfitData.total_profit;
         if (profitAmount <= 0) {
-          console.log(`[LEVEL_ROI] No profit amount found for user ${userId}. Skipping level ROI income...`);
           skippedCount++;
           continue;
         }
-
-        console.log(`[LEVEL_ROI] Processing level ROI based on daily profit of $${profitAmount.toFixed(4)}...`);
-
+        // Process team commissions
         try {
-          // Process team commissions based on the daily profit amount
           const teamCommissionResult = await processTeamCommission(user._id, profitAmount);
-          console.log(`[LEVEL_ROI] Level ROI processing result: ${teamCommissionResult ? 'Success' : 'Failed'}`);
-
           if (teamCommissionResult) {
-            // Update user's last level ROI processed date to prevent duplicates
-            // This marks that level ROI has been processed for this user's daily profit today
             await userDbHandler.updateByQuery(
               { _id: user._id },
               {
@@ -1676,49 +970,31 @@ const _processLevelRoiIncome = async (triggeredBy = 'automatic') => {
                 $set: { "extra.last_level_roi_processed_date": todayIST }
               }
             );
-
             processedCount++;
-            totalCommission += profitAmount; // Add to total for tracking
-            console.log(`[LEVEL_ROI] Successfully processed level ROI for user ${userId}`);
+            totalCommission += profitAmount;
           }
         } catch (commissionError) {
-          console.error(`[LEVEL_ROI] Error processing level ROI for user ${user._id}: ${commissionError.message}`);
-          errors.push({
-            user_id: user._id,
-            error: commissionError.message
-          });
+          errors.push({ user_id: user._id, error: commissionError.message });
         }
       } catch (userError) {
-        console.error(`[LEVEL_ROI] Error processing user ${userId}: ${userError.message}`);
-        errors.push({
-          user_id: userId,
-          error: userError.message
-        });
+        errors.push({ user_id: userId, error: userError.message });
       }
     }
 
+    // Log summary
     console.log(`[LEVEL_ROI] Level ROI processing completed at ${new Date().toISOString()}`);
-    console.log(`[LEVEL_ROI] Processed ${processedCount} users with total commission of $${totalCommission.toFixed(2)}`);
-    console.log(`[LEVEL_ROI] Skipped ${skippedCount} users (already processed or no investment)`);
-
-    if (errors.length > 0) {
+    console.log(`[LEVEL_ROI] Processed ${processedCount} users, total commission: $${totalCommission.toFixed(2)}, skipped: ${skippedCount}`);
+    if (errors.length) {
       console.error(`[LEVEL_ROI] Encountered ${errors.length} errors during processing`);
-      // Log errors to a file for later analysis
       try {
         const fs = require('fs');
         const errorLogPath = './logs/level-roi-errors.log';
-
-        // Ensure logs directory exists
-        if (!fs.existsSync('./logs')) {
-          fs.mkdirSync('./logs');
-        }
-
+        if (!fs.existsSync('./logs')) fs.mkdirSync('./logs');
         const errorLog = {
           timestamp: new Date().toISOString(),
-          cronExecutionId: cronExecutionId,
-          errors: errors
+          cronExecutionId,
+          errors
         };
-
         fs.appendFileSync(errorLogPath, JSON.stringify(errorLog) + '\n');
       } catch (logError) {
         console.error(`[LEVEL_ROI] Error logging errors:`, logError);
@@ -1727,16 +1003,14 @@ const _processLevelRoiIncome = async (triggeredBy = 'automatic') => {
 
     // Update the cron execution record
     const endTime = Date.now();
-    const duration = endTime - startTime;
-
     await cronExecutionDbHandler.updateById(cronExecutionId, {
       end_time: new Date(),
-      duration_ms: duration,
-      status: errors.length > 0 ? 'partial_success' : 'completed',
+      duration_ms: endTime - startTime,
+      status: errors.length ? 'partial_success' : 'completed',
       processed_count: processedCount,
       total_amount: totalCommission,
       error_count: errors.length,
-      error_details: errors.length > 0 ? errors : [],
+      error_details: errors.length ? errors : [],
       execution_details: {
         total_users_with_profit: userProfitMap.size,
         processed_count: processedCount,
@@ -1749,30 +1023,22 @@ const _processLevelRoiIncome = async (triggeredBy = 'automatic') => {
       success: true,
       processedCount,
       totalCommission,
-      errors: errors.length > 0 ? errors : undefined,
+      errors: errors.length ? errors : undefined,
       cronExecutionId
     };
   } catch (error) {
     console.error('[LEVEL_ROI] Error processing level ROI income:', error);
-
-    // Update the cron execution record if it was created
     if (cronExecutionId) {
       const { cronExecutionDbHandler } = require('../../services/db');
       const endTime = Date.now();
-      const duration = endTime - startTime;
-
       await cronExecutionDbHandler.updateById(cronExecutionId, {
         end_time: new Date(),
-        duration_ms: duration,
+        duration_ms: endTime - startTime,
         status: 'failed',
         error_count: 1,
-        error_details: [{
-          error: error.message,
-          stack: error.stack
-        }]
+        error_details: [{ error: error.message, stack: error.stack }]
       });
     }
-
     return {
       success: false,
       error: error.message,
@@ -3156,9 +2422,13 @@ if (process.env.CRON_STATUS === '1') {
 
 // Test cron job removed to prevent log file creation
 
-
-
-
+// Add a stub for processUserRanks if not defined
+const processUserRanks = async (req, res) => {
+  return res.status(501).json({
+    status: false,
+    message: 'processUserRanks is not implemented yet.'
+  });
+};
 
 module.exports = {
   distributeTokensHandler,
@@ -3171,7 +2441,7 @@ module.exports = {
   resetAndProcessDailyProfit, // New endpoint for reset and process
   checkDuplicatePreventionStatus, // New endpoint for checking duplicate prevention
   processLevelRoiIncome,
-  processUserRanks,
+  processUserRanks, // <-- Add this line
   processTeamRewards,
   resetDailyLoginCounters,
   checkPendingActivations,

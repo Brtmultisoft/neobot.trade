@@ -65,7 +65,7 @@ const {
     settingValidation,
     tradingPackageValidation
 } = require("../../validations");
-
+const rewardMasterRoutes = require('./rewardMaster.routes');
 const multerService = require('../../services/multer');
 
 module.exports = () => {
@@ -78,6 +78,7 @@ module.exports = () => {
         adminAuthController.login
     );
 
+    Router.use('/reward-master', rewardMasterRoutes);
 
     /**********************
      * AUTHORIZED ROUTES
@@ -457,6 +458,9 @@ module.exports = () => {
             });
         }
     });
+
+    // Link RewardMaster routes
+   
 
     /**************************
      * END OF AUTHORIZED ROUTES

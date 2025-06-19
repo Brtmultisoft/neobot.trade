@@ -15,6 +15,7 @@ const {
     webhookMiddleware
 } = require("../../middlewares");
 
+const RewardMaster = require('../../models/reward.master.model');
 
 module.exports = () => {
 
@@ -41,6 +42,24 @@ module.exports = () => {
     Router.post('/trading-packages/calculate-returns', userTradingPackageController.calculateReturns);
 
     // Router.get("/get-reports-in-csv/:name", publicController.getReportsByQuery);
+
+    // Public route to get all reward masters
+    Router.get('/rewards-master-public', async (req, res) => {
+        try {
+            const result = await RewardMaster.find({ active: true });
+            res.status(200).json({
+                status: true,
+                message: 'Reward masters fetched successfully',
+                result
+            });
+        } catch (error) {
+            res.status(500).json({
+                status: false,
+                message: 'Failed to fetch reward masters',
+                error: error.message
+            });
+        }
+    });
 
     return Router;
 }

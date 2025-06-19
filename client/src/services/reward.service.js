@@ -203,40 +203,77 @@ export const userRewardService = {
         directReferralsCount: directReferrals.length
       });
 
-      // Reward targets
-      const goaTargets = { self: 1000, direct: 1500 };
-      const bangkokTargets = { self: 5000, direct: 10000 };
+      // Reward targets (all 5)
+      const rewardTypes = [
+        {
+          key: 'goa_tour',
+          name: 'Goa Tour',
+          self_invest_target: 1000,
+          direct_business_target: 1500,
+          reward_value: 'Goa Tour Package',
+          remarks: ''
+        },
+        {
+          key: 'bangkok_tour',
+          name: 'Bangkok Tour',
+          self_invest_target: 2500,
+          direct_business_target: 5000,
+          reward_value: 'Bangkok Tour Package',
+          remarks: ''
+        },
+        {
+          key: 'coupon_code',
+          name: 'Coupon code',
+          self_invest_target: 500,
+          direct_business_target: 800,
+          reward_value: 'Special Coupon Code',
+          remarks: ''
+        },
+        {
+          key: 'car_reward',
+          name: 'Car',
+          self_invest_target: 10000,
+          direct_business_target: 5000,
+          reward_value: 'Car Reward',
+          remarks: ' Monthly Business every month'
+        },
+        {
+          key: 'bike_reward',
+          name: 'Book Your Bike',
+          self_invest_target: 7000,
+          direct_business_target: 4000,
+          reward_value: 'Bike Booking Reward',
+          remarks: ''
+        },
+      ];
 
-      // Calculate progress
-      const goaProgress = {
-        name: "Goa Tour",
-        self_invest_target: goaTargets.self,
-        direct_business_target: goaTargets.direct,
-        current_self_investment: totalSelfInvestment,
-        current_direct_business: totalDirectBusiness,
-        self_investment_progress: Math.min((totalSelfInvestment / goaTargets.self) * 100, 100),
-        direct_business_progress: Math.min((totalDirectBusiness / goaTargets.direct) * 100, 100),
-        overall_progress: Math.min(((totalSelfInvestment / goaTargets.self + totalDirectBusiness / goaTargets.direct) / 2) * 100, 100),
-        is_qualified: totalSelfInvestment >= goaTargets.self && totalDirectBusiness >= goaTargets.direct,
-        status: totalSelfInvestment >= goaTargets.self && totalDirectBusiness >= goaTargets.direct ? "qualified" : "not_qualified",
-        remaining_self_investment: Math.max(0, goaTargets.self - totalSelfInvestment),
-        remaining_direct_business: Math.max(0, goaTargets.direct - totalDirectBusiness)
-      };
+      // Calculate progress for all rewards
+      const rewardProgress = {};
+      const qualifiedRewards = [];
 
-      const bangkokProgress = {
-        name: "Bangkok Tour",
-        self_invest_target: bangkokTargets.self,
-        direct_business_target: bangkokTargets.direct,
-        current_self_investment: totalSelfInvestment,
-        current_direct_business: totalDirectBusiness,
-        self_investment_progress: Math.min((totalSelfInvestment / bangkokTargets.self) * 100, 100),
-        direct_business_progress: Math.min((totalDirectBusiness / bangkokTargets.direct) * 100, 100),
-        overall_progress: Math.min(((totalSelfInvestment / bangkokTargets.self + totalDirectBusiness / bangkokTargets.direct) / 2) * 100, 100),
-        is_qualified: totalSelfInvestment >= bangkokTargets.self && totalDirectBusiness >= bangkokTargets.direct,
-        status: totalSelfInvestment >= bangkokTargets.self && totalDirectBusiness >= bangkokTargets.direct ? "qualified" : "not_qualified",
-        remaining_self_investment: Math.max(0, bangkokTargets.self - totalSelfInvestment),
-        remaining_direct_business: Math.max(0, bangkokTargets.direct - totalDirectBusiness)
-      };
+      for (const reward of rewardTypes) {
+        const selfProgress = Math.min((totalSelfInvestment / reward.self_invest_target) * 100, 100);
+        const directProgress = Math.min((totalDirectBusiness / reward.direct_business_target) * 100, 100);
+        const isQualified = totalSelfInvestment >= reward.self_invest_target || totalDirectBusiness >= reward.direct_business_target;
+        const status = isQualified ? 'qualified' : 'not_qualified';
+        if (isQualified) qualifiedRewards.push(reward.key);
+        rewardProgress[reward.key] = {
+          name: reward.name,
+          self_invest_target: reward.self_invest_target,
+          direct_business_target: reward.direct_business_target,
+          current_self_investment: totalSelfInvestment,
+          current_direct_business: totalDirectBusiness,
+          self_investment_progress: selfProgress,
+          direct_business_progress: directProgress,
+          overall_progress: Math.min((selfProgress + directProgress) / 2, 100),
+          is_qualified: isQualified,
+          status,
+          remaining_self_investment: Math.max(0, reward.self_invest_target - totalSelfInvestment),
+          remaining_direct_business: Math.max(0, reward.direct_business_target - totalDirectBusiness),
+          reward_value: reward.reward_value,
+          remarks: reward.remarks || ''
+        };
+      }
 
       return {
         data: {
@@ -245,20 +282,14 @@ export const userRewardService = {
             total_direct_business: totalDirectBusiness,
             direct_referrals_count: directReferrals.length
           },
-          reward_progress: {
-            goa_tour: goaProgress,
-            bangkok_tour: bangkokProgress
-          },
+          reward_progress: rewardProgress,
           direct_referrals: directReferrals.map(ref => ({
             username: ref.username,
             email: ref.email,
             totalInvestment: ref.total_investment || 0,
             joinDate: ref.createdAt
           })),
-          qualified_rewards: [
-            ...(goaProgress.is_qualified ? ['goa_tour'] : []),
-            ...(bangkokProgress.is_qualified ? ['bangkok_tour'] : [])
-          ]
+          qualified_rewards: qualifiedRewards
         }
       };
     } catch (error) {
@@ -288,36 +319,7 @@ export const userRewardService = {
             total_direct_business: 0,
             direct_referrals_count: 0
           },
-          reward_progress: {
-            goa_tour: {
-              name: "Goa Tour",
-              self_invest_target: 1000,
-              direct_business_target: 1500,
-              current_self_investment: 0,
-              current_direct_business: 0,
-              self_investment_progress: 0,
-              direct_business_progress: 0,
-              overall_progress: 0,
-              is_qualified: false,
-              status: "not_qualified",
-              remaining_self_investment: 1000,
-              remaining_direct_business: 1500
-            },
-            bangkok_tour: {
-              name: "Bangkok Tour",
-              self_invest_target: 5000,
-              direct_business_target: 10000,
-              current_self_investment: 0,
-              current_direct_business: 0,
-              self_investment_progress: 0,
-              direct_business_progress: 0,
-              overall_progress: 0,
-              is_qualified: false,
-              status: "not_qualified",
-              remaining_self_investment: 5000,
-              remaining_direct_business: 10000
-            }
-          },
+          reward_progress: {},
           direct_referrals: [],
           qualified_rewards: [],
           error: 'Failed to fetch data from server'
