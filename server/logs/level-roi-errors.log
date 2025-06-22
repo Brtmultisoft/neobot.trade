@@ -1,0 +1,2 @@
+{"timestamp":"2025-06-21T08:25:41.722Z","cronExecutionId":"68566c7fdc5540dbff3099eb","errors":[{"user_id":"68565c11b966596d074bb8af","error":"Client must be connected before running operations"}]}
+{"timestamp":"2025-06-21T08:28:22.513Z","cronExecutionId":"68566d242ed7505a0548bf8c","errors":[{"user_id":"68565c53b966596d074bb8d9","error":"Client must be connected before running operations"},{"user_id":"68565c11b966596d074bb8af","error":"Client must be connected before running operations"}]}
