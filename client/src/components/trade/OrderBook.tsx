@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Paper, Box, Typography, Stack, Button, alpha } from '@mui/material';
+import { Paper, Box, Typography, Stack, Button, alpha, useTheme } from '@mui/material';
 import { TradingPair } from '../../types/types';
 import { generateOrderBook } from '../../utils/dataSimulation';
 
@@ -13,6 +13,7 @@ const OrderBook: React.FC<OrderBookProps> = ({ tradingActive, currentPair, curre
   const [precision, setPrecision] = useState<string>('0.1');
   const [asks, setAsks] = useState<any[]>([]);
   const [bids, setBids] = useState<any[]>([]);
+  const theme = useTheme();
 
   useEffect(() => {
     let orderBookInterval: number;
@@ -43,9 +44,9 @@ const OrderBook: React.FC<OrderBookProps> = ({ tradingActive, currentPair, curre
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        background: '#12151c',
+        background: theme.palette.background.paper,
         borderRadius: { xs: 0.5, sm: 1 },
-        border: '1px solid rgba(255, 255, 255, 0.05)',
+        border: `1px solid ${theme.palette.divider}`,
         position: 'relative',
         minHeight: { xs: 350, sm: 400, md: 500 }, // Ensure minimum height on all devices
       }}
@@ -58,7 +59,7 @@ const OrderBook: React.FC<OrderBookProps> = ({ tradingActive, currentPair, curre
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'rgba(0, 0, 0, 0.7)',
+            background: theme.palette.background.default,
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
@@ -69,7 +70,7 @@ const OrderBook: React.FC<OrderBookProps> = ({ tradingActive, currentPair, curre
           <Typography
             variant="body1"
             sx={{
-              color: 'rgba(255, 255, 255, 0.7)',
+              color: theme.palette.text.secondary,
               fontSize: { xs: '0.875rem', sm: '1rem' }
             }}
           >
@@ -81,7 +82,7 @@ const OrderBook: React.FC<OrderBookProps> = ({ tradingActive, currentPair, curre
       <Box
         sx={{
           padding: { xs: '8px 12px', sm: '12px 15px' },
-          borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+          borderBottom: '1px solid divider',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -145,7 +146,8 @@ const OrderBook: React.FC<OrderBookProps> = ({ tradingActive, currentPair, curre
           sx={{
             flex: 1,
             overflowY: 'auto',
-            maxHeight: { xs: '150px', sm: '180px', md: '200px' }, // Responsive max height
+            minHeight: { xs: 100, sm: 140, md: 180 }, // Ensure min height for all screens
+            maxHeight: { xs: '150px', sm: '200px', md: '260px', lg: '320px' }, // Responsive max height
             '&::-webkit-scrollbar': {
               width: { xs: '3px', sm: '4px' },
             },
@@ -160,15 +162,15 @@ const OrderBook: React.FC<OrderBookProps> = ({ tradingActive, currentPair, curre
               key={`ask-${index}`}
               sx={{
                 display: 'grid',
-                gridTemplateColumns: '1.2fr 1fr 1fr',
-                padding: { xs: '4px 12px', sm: '5px 16px' },
-                fontSize: { xs: 11, sm: 12, md: 13 },
+                gridTemplateColumns: { xs: '1.2fr 1fr', sm: '1.2fr 1fr 1fr' }, // Hide total on mobile
+                padding: { xs: '4px 8px', sm: '6px 18px', md: '8px 24px' },
+                fontSize: { xs: 11, sm: 13, md: 15 },
                 position: 'relative',
                 '&:hover': {
                   background: 'rgba(255, 255, 255, 0.03)'
                 },
                 color: 'error.main',
-                height: { xs: '24px', sm: 'auto' }, // Fixed height on mobile for better touch
+                height: { xs: '24px', sm: '32px', md: '38px' }, // Taller rows on larger screens
                 alignItems: 'center'
               }}
             >
@@ -193,17 +195,20 @@ const OrderBook: React.FC<OrderBookProps> = ({ tradingActive, currentPair, curre
               >
                 {ask.amount}
               </Box>
-              <Box
-                component="span"
-                sx={{
-                  position: 'relative',
-                  zIndex: 2,
-                  textAlign: 'right',
-                  display: { xs: 'none', sm: 'block' } // Hide on very small screens
-                }}
-              >
-                {ask.total}
-              </Box>
+              {/* Show total only on sm and up */}
+              {(
+                <Box
+                  component="span"
+                  sx={{
+                    position: 'relative',
+                    zIndex: 2,
+                    textAlign: 'right',
+                    display: { xs: 'none', sm: 'block' }
+                  }}
+                >
+                  {ask.total}
+                </Box>
+              )}
               <Box
                 sx={{
                   position: 'absolute',
@@ -222,18 +227,21 @@ const OrderBook: React.FC<OrderBookProps> = ({ tradingActive, currentPair, curre
         {/* Spread Section */}
         <Box
           sx={{
-            padding: { xs: '5px 12px', sm: '7px 16px' },
+            padding: { xs: '5px 8px', sm: '10px 24px', md: '14px 32px' },
             background: 'rgba(0, 0, 0, 0.2)',
             display: 'flex',
-            justifyContent: 'space-between',
-            fontSize: { xs: 11, sm: 12, md: 13 },
-            color: 'text.secondary'
+            justifyContent: 'center', // Center on all screens
+            alignItems: 'center',
+            gap: { xs: 1, sm: 3 },
+            fontSize: { xs: 11, sm: 13, md: 15 },
+            color: 'text.secondary',
+            flexWrap: 'wrap',
           }}
         >
           <Typography
             variant="caption"
             sx={{
-              fontSize: { xs: 11, sm: 12, md: 13 },
+              fontSize: { xs: 11, sm: 13, md: 15 },
               fontWeight: 500
             }}
           >
@@ -242,7 +250,7 @@ const OrderBook: React.FC<OrderBookProps> = ({ tradingActive, currentPair, curre
           <Typography
             variant="caption"
             sx={{
-              fontSize: { xs: 11, sm: 12, md: 13 },
+              fontSize: { xs: 11, sm: 13, md: 15 },
               fontFamily: "'Roboto Mono', monospace",
             }}
           >
@@ -255,7 +263,8 @@ const OrderBook: React.FC<OrderBookProps> = ({ tradingActive, currentPair, curre
           sx={{
             flex: 1,
             overflowY: 'auto',
-            maxHeight: { xs: '150px', sm: '180px', md: '200px' }, // Responsive max height
+            minHeight: { xs: 100, sm: 140, md: 180 },
+            maxHeight: { xs: '150px', sm: '200px', md: '260px', lg: '320px' },
             '&::-webkit-scrollbar': {
               width: { xs: '3px', sm: '4px' },
             },
@@ -270,15 +279,15 @@ const OrderBook: React.FC<OrderBookProps> = ({ tradingActive, currentPair, curre
               key={`bid-${index}`}
               sx={{
                 display: 'grid',
-                gridTemplateColumns: '1.2fr 1fr 1fr',
-                padding: { xs: '4px 12px', sm: '5px 16px' },
-                fontSize: { xs: 11, sm: 12, md: 13 },
+                gridTemplateColumns: { xs: '1.2fr 1fr', sm: '1.2fr 1fr 1fr' },
+                padding: { xs: '4px 8px', sm: '6px 18px', md: '8px 24px' },
+                fontSize: { xs: 11, sm: 13, md: 15 },
                 position: 'relative',
                 '&:hover': {
                   background: 'rgba(255, 255, 255, 0.03)'
                 },
                 color: 'secondary.main',
-                height: { xs: '24px', sm: 'auto' }, // Fixed height on mobile for better touch
+                height: { xs: '24px', sm: '32px', md: '38px' },
                 alignItems: 'center'
               }}
             >
@@ -303,17 +312,20 @@ const OrderBook: React.FC<OrderBookProps> = ({ tradingActive, currentPair, curre
               >
                 {bid.amount}
               </Box>
-              <Box
-                component="span"
-                sx={{
-                  position: 'relative',
-                  zIndex: 2,
-                  textAlign: 'right',
-                  display: { xs: 'none', sm: 'block' } // Hide on very small screens
-                }}
-              >
-                {bid.total}
-              </Box>
+              {/* Show total only on sm and up */}
+              {(
+                <Box
+                  component="span"
+                  sx={{
+                    position: 'relative',
+                    zIndex: 2,
+                    textAlign: 'right',
+                    display: { xs: 'none', sm: 'block' }
+                  }}
+                >
+                  {bid.total}
+                </Box>
+              )}
               <Box
                 sx={{
                   position: 'absolute',

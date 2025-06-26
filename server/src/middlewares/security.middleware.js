@@ -11,7 +11,7 @@ const config = require('../config/config');
 // General API rate limiting
 const apiLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 60 minutes
-    max: 500, // limit each IP to 500 requests per windowMs
+    max: 5000, // limit each IP to 500 requests per windowMs
     message: 'Too many requests from this IP, please try again after 60 minutes',
     standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
     legacyHeaders: false, // Disable the `X-RateLimit-*` headers

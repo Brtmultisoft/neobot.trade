@@ -9,6 +9,7 @@ const responseHelper = require('../../utils/customResponse');
 const { levelIncome, hasUserInvested } = require('./cron.controller');
 const { userModel } = require('../../models');
 const { getChildLevelsByRefer } = require('../../services/commonFun');
+const withdrawalSettingsService = require('../../services/withdrawal-settings.service');
 
 /*******************
  * PRIVATE FUNCTIONS
@@ -167,6 +168,10 @@ module.exports = {
                 wallet_balance: userData.wallet || 0,
                 topup_wallet_balance: userData.wallet_topup || 0
             };
+
+            // Fetch minimum withdrawal amount
+            const withdrawalSettings = await withdrawalSettingsService.getWithdrawalSettings();
+            dashboardData.minimumWithdrawalAmount = withdrawalSettings.minimumWithdrawalAmount;
 
             responseData.msg = `Dashboard Data Fetched Successfully!`;
             responseData.data = dashboardData;

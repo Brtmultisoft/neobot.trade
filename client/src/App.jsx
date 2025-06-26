@@ -41,6 +41,7 @@ import TradeActivationHistory from './pages/TradeActivationHistory';
 
 // Reward Pages
 import RewardProgress from './pages/rewards/RewardProgress';
+import RewardTargets from './pages/rewards/RewardTargets';
 
 // Admin Pages
 import AdminRewardDashboard from './pages/admin/RewardDashboard';
@@ -120,6 +121,7 @@ function App() {
 
               {/* Reward Routes */}
               <Route path="/rewards/progress" element={<RewardProgress />} />
+              <Route path="/rewards/targets" element={<RewardTargets />} />
 
               {/* Admin Routes */}
               <Route path="/admin/rewards/dashboard" element={<AdminRewardDashboard />} />

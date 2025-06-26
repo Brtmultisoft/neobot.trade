@@ -120,9 +120,19 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
   dailyProfitAmount: propDailyProfitAmount,
   loading: propLoading
 }) => {
+  // Debug log for received props
+  console.log('TradingActivation received props:', {
+    propUserROIRate,
+    propDailyProfitAmount,
+    propTotalInvestment,
+    propUserData,
+    propTradingPackage,
+    propLoading
+  });
+
   // Theme and responsive setup
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   // Local state with optimized initial values
   const [userData, setUserData] = useState<any>(propUserData || null);
   const [isLoading, setIsLoading] = useState(propLoading || false);
@@ -131,7 +141,6 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
 
   // State for income calculation - split into separate states for better performance
   const [totalInvested, setTotalInvested] = useState(propTotalInvestment || 0);
-  const [dailyProfitRate] = useState(propUserROIRate || 0.266); // Use dynamic ROI rate or fallback to 0.266%
   const [dailyProfitAmount, setDailyProfitAmount] = useState(propDailyProfitAmount || 0);
   const [currentProfit, setCurrentProfit] = useState(0);
   const [lastActivationTime, setLastActivationTime] = useState<Date | null>(null);
@@ -159,6 +168,76 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
     userData && userData.total_investment > 0,
     [userData]
   );
+
+  // Sync local state with props
+  useEffect(() => {
+    setDailyProfitAmount(typeof propDailyProfitAmount === 'number' && !isNaN(propDailyProfitAmount) ? propDailyProfitAmount : 0);
+    setTotalInvested(typeof propTotalInvestment === 'number' && !isNaN(propTotalInvestment) ? propTotalInvestment : 0);
+  }, [propDailyProfitAmount, propTotalInvestment]);
+
+  // Always use propUserROIRate for ROI display
+  const roiRate = useMemo(() => {
+    return (typeof propUserROIRate === 'number' && !isNaN(propUserROIRate)) ? propUserROIRate : 0;
+  }, [propUserROIRate]);
+
+  // Helper: Get ms until next midnight
+  const getMsUntilMidnight = () => {
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setHours(24, 0, 0, 0);
+    return tomorrow.getTime() - now.getTime();
+  };
+
+  // Helper: Get ms since activation or since midnight if already activated
+  const getMsSinceStart = () => {
+    if (tradingActive && lastActivationTime) {
+      // If just activated, start from activation time
+      return Date.now() - new Date(lastActivationTime).setSeconds(0, 0);
+    } else {
+      // If already activated, start from midnight
+      const now = new Date();
+      return now.getTime() - new Date(now.setHours(0, 0, 0, 0)).getTime();
+    }
+  };
+
+  // Calculate current profit based on time elapsed since start
+  const calculateCurrentProfit = useCallback(() => {
+    if (!dailyProfitAmount) return 0;
+    const msSinceStart = getMsSinceStart();
+    const dayPortion = Math.min(msSinceStart / 86400000, 1); // 86400000 ms in a day
+    return dailyProfitAmount * dayPortion;
+  }, [dailyProfitAmount, tradingActive, lastActivationTime]);
+
+  // Update current profit and progress every second, reset at midnight
+  useEffect(() => {
+    if (tradingActive || alreadyActivated) {
+      setCurrentProfit(calculateCurrentProfit());
+      setTimeElapsed('');
+
+      const interval = setInterval(() => {
+        setCurrentProfit(calculateCurrentProfit());
+      }, 1000);
+
+      const midnightTimeout = setTimeout(() => {
+        setCurrentProfit(0);
+        setTimeElapsed('');
+      }, getMsUntilMidnight());
+
+      return () => {
+        clearInterval(interval);
+        clearTimeout(midnightTimeout);
+      };
+    } else {
+      setCurrentProfit(0);
+      setTimeElapsed('');
+    }
+  }, [calculateCurrentProfit, tradingActive, alreadyActivated]);
+
+  // Progress percent for the progress bar
+  const progressPercent = useMemo(() => {
+    if (!dailyProfitAmount) return 0;
+    return Math.min((currentProfit / dailyProfitAmount) * 100, 100);
+  }, [currentProfit, dailyProfitAmount]);
 
   // Helper function to show snackbar messages
   const showSnackbar = useCallback((message: string, severity: 'success' | 'error' | 'warning' | 'info') => {
@@ -288,30 +367,20 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
   // Helper function to process user data (extracted to avoid code duplication)
   const processUserData = useCallback((user: any) => {
     setUserData(user);
-
-    // Calculate income trading values
     const investedAmount = user.total_investment || 0;
-    const profitRate = 0.266; // 0.266% daily profit rate
-    const profitAmount = (investedAmount * profitRate) / 100;
+    const profitAmount = (investedAmount * (roiRate || 0)) / 100;
     const activationTime = user.lastDailyProfitActivation ? new Date(user.lastDailyProfitActivation) : null;
-
-    // Update individual state variables
     setTotalInvested(investedAmount);
     setDailyProfitAmount(profitAmount);
     setLastActivationTime(activationTime);
-
-    // Store the calculated values in localStorage for persistence
     localStorage.setItem('totalInvested', investedAmount.toString());
     localStorage.setItem('dailyProfitAmount', profitAmount.toFixed(2));
-    localStorage.setItem('dailyProfitRate', profitRate.toString());
-
-    // If user has activated daily profit
+    localStorage.setItem('dailyProfitRate', (roiRate || 0).toString());
     if (user.dailyProfitActivated && !tradingActive) {
       onActivate();
       setAlreadyActivated(true);
     }
-
-  }, [tradingActive, onActivate]);
+  }, [tradingActive, onActivate, roiRate]);
 
   // Fetch user profile data on component mount - optimized with useCallback
   const fetchUserProfile = useCallback(async () => {
@@ -478,8 +547,6 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
     }
   }, [tradingActive, alreadyActivated, hasInvestment, userData, onActivate, showSnackbar, activateDailyTrading, getUserProfile]);
 
-
-
   // Timer reference to clear on unmount
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -503,64 +570,6 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   }, [lastActivationTime]);
 
-  // Function to calculate current profit based on time elapsed since activation
-  const calculateCurrentProfit = useCallback(() => {
-    if (!lastActivationTime || !dailyProfitAmount) {
-      return 0;
-    }
-
-    const now = new Date();
-    const activationTime = new Date(lastActivationTime);
-
-    // Calculate time elapsed in milliseconds
-    const elapsedMs = now.getTime() - activationTime.getTime();
-
-    // Calculate what portion of the day has passed (24 hours = 86400000 milliseconds)
-    const dayPortion = Math.min(elapsedMs / 86400000, 1); // Cap at 1 (full day)
-
-    // Calculate current profit based on portion of day passed
-    return dailyProfitAmount * dayPortion;
-  }, [lastActivationTime, dailyProfitAmount]);
-
-  // Update current profit every second
-  useEffect(() => {
-    // Only start timer if trading is active and we have a last activation time
-    if ((tradingActive || alreadyActivated) && lastActivationTime) {
-      // Initial calculation
-      const initialProfit = calculateCurrentProfit();
-      setCurrentProfit(initialProfit);
-
-      // Trigger animation effect with slower animation
-      setProfitUpdated(true);
-      setTimeout(() => setProfitUpdated(false), 1200);
-
-      // Set up timer to update every 2 seconds
-      timerRef.current = setInterval(() => {
-        const newProfit = calculateCurrentProfit();
-        const formattedTime = formatTimeElapsed();
-
-        // Update states
-        setCurrentProfit(newProfit);
-        setTimeElapsed(formattedTime);
-
-        // Trigger animation effect every 20 seconds (slowed down from 10 seconds)
-        if (Math.floor(Date.now() / 1000) % 20 === 0) {
-          setProfitUpdated(true);
-          // Slower animation fade-out
-          setTimeout(() => setProfitUpdated(false), 1200);
-        }
-      }, 2000); // Changed from 1000ms to 2000ms for slower updates
-
-      // Clean up timer on unmount
-      return () => {
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-        }
-      };
-    }
-  }, [tradingActive, alreadyActivated, lastActivationTime, calculateCurrentProfit, formatTimeElapsed]);
-
   // No need for a separate useEffect to call getUserProfile
   // as it's already being called in fetchUserProfile which is called on mount
 
@@ -569,14 +578,16 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
       sx={{
         position: 'relative',
         overflow: 'hidden',
-        borderRadius: '20px',
+        borderRadius: { xs: '12px', md: '20px' },
         border: 'none',
-        padding: { xs: '20px', md: '25px' },
-        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.25)',
+        padding: { xs: '16px', sm: '20px', md: '25px' },
+        boxShadow: theme.palette.mode === 'dark'
+          ? '0 10px 30px rgba(0,0,0,0.25)'
+          : '0 4px 16px rgba(0,0,0,0.08)',
         width: '100%',
         maxWidth: '100%',
         boxSizing: 'border-box',
-        background: 'linear-gradient(135deg, rgba(30, 30, 40, 0.95) 0%, rgba(15, 15, 25, 0.97) 100%)',
+        background: theme.palette.background.paper,
         '&::before': {
           content: '""',
           position: 'absolute',
@@ -584,10 +595,10 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
           left: 0,
           right: 0,
           height: '4px',
-          background: 'linear-gradient(90deg, #0ecb81, #0bb974)',
+          background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
           opacity: tradingActive ? 1 : 0.3,
-          transition: 'opacity 0.5s ease'
-        }
+          transition: 'opacity 0.5s ease',
+        },
       }}
     >
       <Box sx={{ width: '100%' }}>
@@ -830,16 +841,18 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
           <Paper
             elevation={0}
             sx={{
-              background: 'rgba(30, 30, 40, 0.5)',
-              padding: '20px',
+              background: theme.palette.background.paper,
+              padding: { xs: '16px', sm: '20px' },
               borderRadius: '16px',
-              border: '1px solid rgba(255, 255, 255, 0.05)',
+              border: `1px solid ${theme.palette.divider}`,
               width: '100%',
               height: '100%',
               transition: 'transform 0.3s ease, box-shadow 0.3s ease',
               '&:hover': {
                 transform: 'translateY(-3px)',
-                boxShadow: '0 15px 30px rgba(0, 0, 0, 0.3)'
+                boxShadow: theme.palette.mode === 'dark'
+                  ? '0 15px 30px rgba(0,0,0,0.3)'
+                  : '0 8px 24px rgba(240,185,11,0.08)'
               }
             }}
           >
@@ -848,7 +861,7 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
                 <Typography
                   variant="subtitle1"
                   sx={{
-                    color: 'rgba(255, 255, 255, 0.7)',
+                    color: theme.palette.text.secondary,
                     fontWeight: 500,
                     letterSpacing: '0.5px',
                     fontSize: '0.9rem'
@@ -861,13 +874,13 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
                     width: 36,
                     height: 36,
                     borderRadius: '12px',
-                    background: 'rgba(255, 255, 255, 0.05)',
+                    background: theme.palette.action.selected,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}
                 >
-                  <Typography sx={{ color: 'white', fontSize: '1.2rem' }}>💰</Typography>
+                  <Typography sx={{ color: theme.palette.text.primary, fontSize: '1.2rem' }}>💰</Typography>
                 </Box>
               </Box>
 
@@ -877,18 +890,18 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
                   fontFamily: "'Roboto Mono', monospace",
                   fontWeight: 700,
                   fontSize: { xs: '1.5rem', sm: '1.8rem' },
-                  color: 'white',
+                  color: theme.palette.text.primary,
                   mb: 1
                 }}
               >
-                {totalInvested.toFixed(2)} <span style={{ fontSize: '1rem', opacity: 0.7 }}>USDT</span>
+                {totalInvested.toFixed(2)} <span style={{ fontSize: '1rem', opacity: 0.7, color: theme.palette.text.secondary }}>USDT</span>
               </Typography>
 
               <Box
                 sx={{
                   mt: 'auto',
                   pt: 2,
-                  borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+                  borderTop: `1px solid ${theme.palette.divider}`,
                   display: 'flex',
                   alignItems: 'center',
                   gap: 1
@@ -899,10 +912,10 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
                     width: 8,
                     height: 8,
                     borderRadius: '50%',
-                    bgcolor: 'white',
+                    bgcolor: theme.palette.primary.main,
                   }}
                 />
-                <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.5)' }}>
+                <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
                   Your base investment amount
                 </Typography>
               </Box>
@@ -913,10 +926,10 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
           <Paper
             elevation={0}
             sx={{
-              background: 'rgba(30, 30, 40, 0.5)',
-              padding: '20px',
+              background: theme.palette.background.paper,
+              padding: { xs: '16px', sm: '20px' },
               borderRadius: '16px',
-              border: '1px solid rgba(14, 203, 129, 0.1)',
+              border: `1px solid ${theme.palette.secondary.main}33`,
               width: '100%',
               height: '100%',
               transition: 'transform 0.3s ease, box-shadow 0.3s ease',
@@ -924,7 +937,9 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
               overflow: 'hidden',
               '&:hover': {
                 transform: 'translateY(-3px)',
-                boxShadow: '0 15px 30px rgba(0, 0, 0, 0.3)'
+                boxShadow: theme.palette.mode === 'dark'
+                  ? '0 15px 30px rgba(0,0,0,0.3)'
+                  : '0 8px 24px rgba(14,203,129,0.08)'
               },
               '&::before': tradingActive ? {
                 content: '""',
@@ -933,7 +948,7 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
                 left: 0,
                 width: '100%',
                 height: '100%',
-                background: 'radial-gradient(circle at top right, rgba(14, 203, 129, 0.1) 0%, transparent 70%)',
+                background: `radial-gradient(circle at top right, ${theme.palette.secondary.main}11 0%, transparent 70%)`,
                 zIndex: 0
               } : {}
             }}
@@ -943,30 +958,28 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
                 <Typography
                   variant="subtitle1"
                   sx={{
-                    color: 'rgba(14, 203, 129, 0.8)',
+                    color: theme.palette.secondary.main,
                     fontWeight: 500,
                     letterSpacing: '0.5px',
                     fontSize: '0.9rem'
                   }}
                 >
-                  DAILY PROFIT ({dailyProfitRate}%)
+                  DAILY PROFIT ({roiRate}% )
                 </Typography>
                 <Box
                   sx={{
                     width: 36,
                     height: 36,
                     borderRadius: '12px',
-                    background: 'rgba(14, 203, 129, 0.1)',
+                    background: theme.palette.secondary.light + '22',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}
                 >
-                  <Typography sx={{ color: 'white', fontSize: '1.2rem' }}>📈</Typography>
+                  <Typography sx={{ color: theme.palette.text.primary, fontSize: '1.2rem' }}>📈</Typography>
                 </Box>
               </Box>
-
-              {/* Profit Amount */}
               <Box sx={{ position: 'relative' }}>
                 <Typography
                   variant="h4"
@@ -974,14 +987,13 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
                     fontFamily: "'Roboto Mono', monospace",
                     fontWeight: 700,
                     fontSize: { xs: '1.5rem', sm: '1.8rem' },
-                    color: 'secondary.main',
+                    color: theme.palette.text.primary,
                     mb: 1,
                     animation: profitUpdated ? `${numberChangeAnimation} 1.2s ease-in-out` : 'none',
                   }}
                 >
-                  +{currentProfit.toFixed(6)} <span style={{ fontSize: '1rem', opacity: 0.7 }}>USDT</span>
+                  +{currentProfit.toFixed(6)} <span style={{ fontSize: '1rem', opacity: 0.7, color: theme.palette.text.secondary }}>USDT</span>
                 </Typography>
-
                 {tradingActive && (
                   <Tooltip title="Live profit calculation based on time elapsed since activation">
                     <Box
@@ -992,22 +1004,20 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
                         width: 10,
                         height: 10,
                         borderRadius: '50%',
-                        bgcolor: 'secondary.main',
+                        bgcolor: theme.palette.secondary.main,
                         animation: `${pulseAnimation} 2.5s infinite`
                       }}
                     />
                   </Tooltip>
                 )}
               </Box>
-
-              {/* Progress Section */}
               <Box sx={{ mt: 2 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                   <Typography
                     variant="caption"
                     sx={{
                       fontFamily: "'Roboto Mono', monospace",
-                      color: 'rgba(255, 255, 255, 0.7)',
+                      color: theme.palette.text.secondary,
                       fontSize: '0.75rem'
                     }}
                   >
@@ -1017,37 +1027,33 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
                     variant="caption"
                     sx={{
                       fontFamily: "'Roboto Mono', monospace",
-                      color: 'secondary.main',
+                      color: theme.palette.secondary.main,
                       fontSize: '0.75rem',
                       fontWeight: 600
                     }}
                   >
-                    {Math.min(((currentProfit / dailyProfitAmount) * 100), 100).toFixed(1)}%
+                    {progressPercent.toFixed(1)}%
                   </Typography>
                 </Box>
-
-                {/* Progress bar showing percentage of daily profit earned */}
                 <LinearProgress
                   variant="determinate"
-                  value={Math.min((currentProfit / dailyProfitAmount) * 100, 100)}
+                  value={progressPercent}
                   sx={{
                     height: 8,
                     borderRadius: 4,
-                    backgroundColor: 'rgba(14, 203, 129, 0.1)',
+                    backgroundColor: theme.palette.secondary.light + '11',
                     '& .MuiLinearProgress-bar': {
-                      backgroundColor: 'secondary.main',
+                      backgroundColor: theme.palette.secondary.main,
                       borderRadius: 4
                     }
                   }}
                 />
               </Box>
-
-              {/* Footer Info */}
               <Box
                 sx={{
                   mt: 'auto',
                   pt: 2,
-                  borderTop: '1px solid rgba(14, 203, 129, 0.1)',
+                  borderTop: `1px solid ${theme.palette.secondary.main}22`,
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center'
@@ -1059,14 +1065,13 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
                       width: 8,
                       height: 8,
                       borderRadius: '50%',
-                      bgcolor: 'secondary.main',
+                      bgcolor: theme.palette.secondary.main,
                     }}
                   />
-                  <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.5)' }}>
+                  <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
                     {/* Max: {dailyProfitAmount.toFixed(2)} USDT */}
                   </Typography>
                 </Box>
-
                 {lastActivationTime && (
                   <Tooltip title="Time elapsed since activation">
                     <Box
@@ -1074,7 +1079,7 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
                         display: 'flex',
                         alignItems: 'center',
                         gap: 0.5,
-                        backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                        backgroundColor: theme.palette.action.selected,
                         padding: '2px 8px',
                         borderRadius: '4px',
                       }}
@@ -1084,7 +1089,7 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
                           width: 6,
                           height: 6,
                           borderRadius: '50%',
-                          bgcolor: 'secondary.main',
+                          bgcolor: theme.palette.secondary.main,
                           animation: `${pulseAnimation} 2.5s infinite`
                         }}
                       />
@@ -1092,7 +1097,7 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
                         variant="caption"
                         sx={{
                           fontFamily: "'Roboto Mono', monospace",
-                          color: 'rgba(255, 255, 255, 0.7)',
+                          color: theme.palette.text.secondary,
                           fontSize: '0.75rem',
                         }}
                       >

@@ -168,18 +168,7 @@ const InvestmentHistory = () => {
           </Card>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={4}>
-          <Card elevation={0} sx={{ borderRadius: 2, border: `1px solid ${theme.palette.divider}` }}>
-            <CardContent>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Daily MPR Rate
-              </Typography>
-              <Typography variant="h5" fontWeight="bold" color="primary">
-                 1-1.15 %
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
+      
       </Grid>
 
       {/* Investment Table */}

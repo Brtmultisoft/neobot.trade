@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Box } from '@mui/material';
+import { Box, useTheme, useMediaQuery } from '@mui/material';
 import CustomGrid from '../common/CustomGrid';
 import { TradingPair } from '../../types/types';
 import { tradingPairs } from '../../data/tradingPairs';
@@ -11,11 +11,11 @@ import ExchangeSelector from './ExchangeSelector';
 import TradingLayout from './TradingLayout';
 import PairSelector from './PairSelector';
 import BasePriceDisplay from './BasePriceDisplay';
-import FloatingProfits from './FloatingProfits';
 import { useTradingData } from '../../hooks/useTradingData';
 import UserService from '../../services/user.service';
 import InvestmentService from '../../services/investment.service';
 import TradingPackageService from '../../services/tradingpackage.service';
+import MetricsPanel from '../liveTrade/dashboard/MetricsPanel';
 
 const TradingDashboard: React.FC = () => {
 // const {
@@ -68,7 +68,7 @@ const TradingDashboard: React.FC = () => {
   const [userData, setUserData] = useState<any>(null);
   const [userInvestments, setUserInvestments] = useState<any[]>([]);
   const [currentTradingPackage, setCurrentTradingPackage] = useState<any>(null);
-  const [userROIRate, setUserROIRate] = useState<number>(1.0);
+  const [userROIRate, setUserROIRate] = useState<number | null>(null);
   const [totalInvestment, setTotalInvestment] = useState<number>(0);
   const [dailyProfitAmount, setDailyProfitAmount] = useState<number>(0);
   // Update currentPrice when binancePrice changes
@@ -161,12 +161,12 @@ const TradingDashboard: React.FC = () => {
   useEffect(() => {
     if (tradingActive) {
       const pairInfo = getCurrentPairInfo();
-      console.log(`Trading activated with ${pairInfo.fullName} on ${currentExchange.name}`);
-      console.log('Auto-switching pairs every 30 seconds');
-      console.log('Auto-switching exchanges every 5 seconds (via API)');
-      console.log('Using Binance API for real-time price data with 10-second updates');
-      console.log(`BTCUSDT base price: $${basePrice?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || 'Loading...'}`);
-      console.log(`Current ${currentPair.symbol} price: $${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+      // console.log(`Trading activated with ${pairInfo.fullName} on ${currentExchange.name}`);
+      // console.log('Auto-switching pairs every 30 seconds');
+      // console.log('Auto-switching exchanges every 5 seconds (via API)');
+      // console.log('Using Binance API for real-time price data with 10-second updates');
+      // console.log(`BTCUSDT base price: $${basePrice?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || 'Loading...'}`);
+      // console.log(`Current ${currentPair.symbol} price: $${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
 
       if (binanceError) {
         console.warn(`Binance API error: ${binanceError}`);
@@ -191,39 +191,6 @@ const TradingDashboard: React.FC = () => {
     };
   }, [tradingActive, incrementSessionTime]);
 
-  // Generate dynamic floating profits based on user's actual investment and ROI
-  useEffect(() => {
-    let profitInterval: number;
-
-    if (tradingActive && totalInvestment > 0) {
-      profitInterval = window.setInterval(() => {
-        // Calculate profit based on user's actual investment and ROI rate
-        const baseProfit = (totalInvestment * userROIRate) / 100; // Daily profit
-        const profitPerSecond = baseProfit / (24 * 60 * 60); // Convert to per second
-
-        // Add some randomness (±20% variation)
-        const randomMultiplier = 0.8 + (Math.random() * 0.4); // 0.8 to 1.2
-        const actualProfit = profitPerSecond * randomMultiplier;
-
-        // 95% chance of profit, 5% chance of small loss
-        const isProfit = Math.random() > 0.05;
-        const amount = isProfit ? actualProfit : (-actualProfit * 0.1);
-
-        // Update total profit
-        setTotalProfit(prev => prev + amount);
-
-        // Log profit details for debugging
-        if (Math.random() < 0.01) { // Log 1% of the time to avoid spam
-          console.log(`Dynamic profit: $${amount.toFixed(6)} (Base: $${baseProfit.toFixed(2)}/day, ROI: ${userROIRate}%)`);
-        }
-      }, 1000);
-    }
-
-    return () => {
-      if (profitInterval) clearInterval(profitInterval);
-    };
-  }, [tradingActive, totalInvestment, userROIRate, setTotalProfit]);
-
   // Handle trading activation
   const handleActivateTrading = () => {
     setTradingActive(true);
@@ -243,46 +210,28 @@ const TradingDashboard: React.FC = () => {
 
         // 2. Get user investments
         const investmentResponse = await InvestmentService.getUserInvestments();
-        if (investmentResponse && investmentResponse.status && investmentResponse.data?.docs) {
-          const investments = investmentResponse.data.docs;
+        if (investmentResponse && investmentResponse.status && investmentResponse.data) {
+          // Support both .docs and direct array
+          const investments = investmentResponse.data.docs || investmentResponse.data || [];
           setUserInvestments(investments);
-
-          // Calculate total investment
-          const totalInvested = investments.reduce((sum: number, inv: any) => sum + (inv.amount || 0), 0);
-          setTotalInvestment(totalInvested);
-
-          console.log("User investments loaded:", investments);
-          console.log("Total investment amount:", totalInvested);
-
-          // 3. Get current trading package info
-          if (user.current_trading_package_id) {
-            try {
-              const packageResponse = await TradingPackageService.getTradingPackageById(user.current_trading_package_id);
-              if (packageResponse && packageResponse.status) {
-                const tradingPackage = packageResponse.data;
-                setCurrentTradingPackage(tradingPackage);
-                setUserROIRate(tradingPackage.daily_trading_roi || 1.0);
-
-                // Calculate daily profit based on user's actual investment and package ROI
-                const dailyProfit = (totalInvested * (tradingPackage.daily_trading_roi || 1.0)) / 100;
-                setDailyProfitAmount(dailyProfit);
-
-                console.log("Current trading package:", tradingPackage);
-                console.log("User ROI rate:", tradingPackage.daily_trading_roi);
-                console.log("Daily profit amount:", dailyProfit);
-              }
-            } catch (packageError) {
-              console.error('Error fetching trading package:', packageError);
-              // Fallback to default values
-              setUserROIRate(1.0);
-              setDailyProfitAmount((totalInvested * 1.0) / 100);
-            }
+          // Find the active investment
+          const activeInvestment = investments.find((inv: any) => inv.status === 'active');
+          if (activeInvestment) {
+            const amount = activeInvestment.amount || 0;
+            const roi = typeof activeInvestment.daily_profit === 'number'
+              ? activeInvestment.daily_profit
+              : (activeInvestment.extra && typeof activeInvestment.extra.daily_roi_percentage === 'number'
+                ? activeInvestment.extra.daily_roi_percentage
+                : 0);
+            setTotalInvestment(amount);
+            setUserROIRate(roi);
+            setDailyProfitAmount((amount * roi) / 100);
           } else {
-            // No current package, use default ROI
-            console.log("No current trading package found, using default ROI");
-            setUserROIRate(1.0);
-            setDailyProfitAmount((totalInvested * 1.0) / 100);
+            setTotalInvestment(0);
+            setUserROIRate(0);
+            setDailyProfitAmount(0);
           }
+          return;
         }
       }
     } catch (error) {
@@ -296,10 +245,47 @@ const TradingDashboard: React.FC = () => {
     fetchUserTradingData();
   }, []);
 
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isTablet = useMediaQuery(theme.breakpoints.between('sm', 'md'));
+  const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
+
+  // Responsive paddings and spacing
+  const containerPadding = isMobile ? 1 : isTablet ? 2 : 3;
+  const gridSpacing = isMobile ? 1 : 2;
+  const boxPadding = isMobile ? 0.5 : isTablet ? 1.5 : 2.5;
+
+  console.log('TradingActivation props:', {
+    userROIRate,
+    dailyProfitAmount,
+    totalInvestment,
+    userData,
+    currentTradingPackage,
+    loading
+  });
+
   return (
-    <Box sx={{ width: '100%', maxWidth: '100%', overflowX: 'hidden' }}>
-      <CustomGrid container spacing={0} sx={{ width: '100%', maxWidth: '100%', margin: 0, padding: 0 }}>
-        <CustomGrid item xs={12} sx={{ width: '100%', maxWidth: '100%', padding: 0 }}>
+    <Box
+      sx={{
+        width: '100%',
+        maxWidth: '100%',
+        overflowX: 'hidden',
+        bgcolor: theme.palette.background.default,
+        minHeight: '100vh',
+        p: containerPadding,
+      }}
+    >
+      <CustomGrid
+        container
+        spacing={gridSpacing}
+        sx={{
+          width: '100%',
+          maxWidth: '100%',
+          margin: 0,
+          padding: 0,
+        }}
+      >
+        <CustomGrid item xs={12} sx={{ width: '100%', maxWidth: '100%', padding: boxPadding }}>
           <Box sx={{ width: '100%', maxWidth: '100%', margin: 0 }}>
             <MarketTrendVisualization
               tradingActive={tradingActive}
@@ -308,8 +294,7 @@ const TradingDashboard: React.FC = () => {
             />
           </Box>
         </CustomGrid>
-
-        <CustomGrid item xs={12} sx={{ width: '100%', maxWidth: '100%', padding: 0 }}>
+        <CustomGrid item xs={12} sx={{ width: '100%', maxWidth: '100%', padding: boxPadding }}>
           <Box sx={{ width: '100%', maxWidth: '100%', margin: 0 }}>
             <TradingActivation
               tradingActive={tradingActive}
@@ -317,18 +302,16 @@ const TradingDashboard: React.FC = () => {
               sessionTime={sessionTime}
               totalProfit={totalProfit}
               activeTrades={activeTrades}
-              // Dynamic user data
               userData={userData}
               currentTradingPackage={currentTradingPackage}
-              userROIRate={userROIRate}
+              userROIRate={userROIRate ?? undefined}
               totalInvestment={totalInvestment}
               dailyProfitAmount={dailyProfitAmount}
               loading={loading}
             />
           </Box>
         </CustomGrid>
-
-        <CustomGrid item xs={12} sx={{ width: '100%', maxWidth: '100%', padding: 0 }}>
+        <CustomGrid item xs={12} sx={{ width: '100%', maxWidth: '100%', padding: boxPadding }}>
           <Box sx={{ width: '100%', maxWidth: '100%', margin: 0 }}>
             <ExchangeSelector
               currentExchange={currentExchange}
@@ -337,7 +320,6 @@ const TradingDashboard: React.FC = () => {
             />
           </Box>
         </CustomGrid>
-
         {/* Display BTCUSDT base price */}
         {/* <CustomGrid item xs={12} sx={{ width: '100%', maxWidth: '100%', padding: 0 }}>
           <Box sx={{ width: '100%', maxWidth: '100%', margin: 0 }}>
@@ -347,35 +329,44 @@ const TradingDashboard: React.FC = () => {
             />
           </Box>
         </CustomGrid> */}
-
-        <CustomGrid item xs={12} sx={{ width: '100%', maxWidth: '100%', padding: 0 }}>
+        <CustomGrid item xs={12} sx={{ width: '100%', maxWidth: '100%', padding: boxPadding }}>
           {binanceLoading && !binancePrice ? (
-            <Box sx={{
-              p: 2,
-              textAlign: 'center',
-              color: 'primary.main',
-              fontSize: '0.875rem'
-            }}>
+            <Box
+              sx={{
+                p: 2,
+                textAlign: 'center',
+                color: theme.palette.primary.main,
+                fontSize: { xs: '0.85rem', sm: '1rem' },
+              }}
+            >
               Loading price data from Binance API...
             </Box>
           ) : binanceError ? (
-            <Box sx={{
-              p: 2,
-              textAlign: 'center',
-              color: 'error.main',
-              fontSize: '0.875rem'
-            }}>
+            <Box
+              sx={{
+                p: 2,
+                textAlign: 'center',
+                color: theme.palette.error.main,
+                fontSize: { xs: '0.85rem', sm: '1rem' },
+              }}
+            >
               Error loading price data: {binanceError}
             </Box>
           ) : null}
-
           <TradingLayout
             currentPair={currentPair}
             tradingActive={tradingActive}
             currentPrice={currentPrice}
           />
         </CustomGrid>
-
+        {/* <CustomGrid item xs={12} sx={{ width: '100%', maxWidth: '100%', padding: 0 }}>
+          <MetricsPanel
+            btcPrice={btcPrice || 0}
+            totalInvestment={totalInvestment || 0}
+            roiRate={userROIRate}
+            dailyProfitAmount={dailyProfitAmount}
+          />
+        </CustomGrid> */}
         {/* <CustomGrid item xs={12}>
           <PairSelector
             currentPair={currentPair}
@@ -384,8 +375,6 @@ const TradingDashboard: React.FC = () => {
           />
         </CustomGrid> */}
       </CustomGrid>
-
-      {tradingActive && <FloatingProfits />}
     </Box>
   );
 };

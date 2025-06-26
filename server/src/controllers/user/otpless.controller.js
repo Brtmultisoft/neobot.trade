@@ -137,7 +137,7 @@ const otplessController = {
             // If a valid referral ID is provided, find the referring user
             if (trace_id) {
                 // First check if it's a sponsor ID
-                if (trace_id.startsWith('HS') || trace_id.startsWith('SI')) {
+                if (trace_id.startsWith('NB') || trace_id.startsWith('SI')) {
                     let sponsorUser = await userDbHandler.getOneByQuery({ sponsorID: trace_id }, { _id: 1 });
                     if (sponsorUser) {
                         refer_id = sponsorUser._id;
@@ -202,7 +202,7 @@ const otplessController = {
 
             // Generate a unique sponsor ID (matching existing logic)
             const generateSponsorId = async () => {
-                const prefix = 'HS';
+                const prefix = 'NB';
                 let isUnique = false;
                 let sponsorId = '';
 

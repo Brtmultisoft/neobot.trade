@@ -339,7 +339,7 @@ export default function AdminSettings() {
             <Tab icon={<PersonIcon />} label="Profile" />
             <Tab icon={<LockIcon />} label="Password" />
             <Tab icon={<SecurityIcon />} label="OTP Settings" />
-            <Tab icon={<SettingsIcon />} label="General" />
+            {/* <Tab icon={<SettingsIcon />} label="General" /> */}
           </Tabs>
         </Box>
 

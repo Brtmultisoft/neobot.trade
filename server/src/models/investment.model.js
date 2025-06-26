@@ -41,7 +41,7 @@ const investmentSchema = new Schema({
     },
     daily_profit: {
         type: Number,
-        default: 2.5
+        default: 0
     },
     first_deposit_bonus: {
         type: Number,
@@ -74,7 +74,7 @@ const investmentSchema = new Schema({
     },
     status: {
         type: String,
-        enum: ['active', 'completed', 'cancelled', 1, 2, 0],
+        enum: ['active', 'completed', 'cancelled',"expired", 1, 2, 0],
         default: 'active'
     },
     start_date: {

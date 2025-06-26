@@ -49,6 +49,8 @@ import RewardTest from './pages/reward/RewardTest';
 import RewardsList from './pages/reward/RewardsList';
 import RewardDebug from './pages/reward/RewardDebug';
 import RewardMasterList from './pages/reward/RewardMasterList';
+import RewardEligibleUsers from './pages/reward/RewardEligibleUsers';
+import RewardAllData from './pages/reward/RewardAllData';
 
 // Settings Pages
 import AdminSettings from './pages/settings/AdminSettings';
@@ -168,12 +170,9 @@ function App() {
             <Route path="/update-profit-status" element={<UpdateProfitStatus />} />
 
             {/* Reward Routes */}
-            <Route path="/rewards" element={<RewardTracking />} />
-            <Route path="/rewards-list" element={<RewardsList />} />
-            <Route path="/rewards/:id" element={<RewardDetails />} />
-            <Route path="/reward-test" element={<RewardTest />} />
-            <Route path="/reward-debug" element={<RewardDebug />} />
             <Route path="/reward-master-list" element={<RewardMasterList />} />
+            <Route path="/reward-eligible-users" element={<RewardEligibleUsers />} />
+            <Route path="/reward-all-data" element={<RewardAllData />} />
 
             {/* Settings Routes */}
             <Route path="/settings" element={<AdminSettings />} />

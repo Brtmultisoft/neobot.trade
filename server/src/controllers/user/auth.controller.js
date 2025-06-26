@@ -115,9 +115,9 @@ const generateTraceId = () => {
     return traceId;
 };
 
-// Generate a unique sponsor ID (HS + 5 digits)
+// Generate a unique sponsor ID (NB + 5 digits)
 const generateSponsorId = async() => {
-    const prefix = 'HS';
+    const prefix = 'NB';
     let isUnique = false;
     let sponsorId = '';
 
@@ -854,7 +854,7 @@ module.exports = {
             }
 
             // Check if it's a sponsor ID
-            if (req.body.refer_id.startsWith('HS') || req.body.refer_id.startsWith('SI')) {
+            if (req.body.refer_id.startsWith('NB') || req.body.refer_id.startsWith('SI')) {
                 const sponsorUser = await userDbHandler.getOneByQuery({ sponsorID: req.body.refer_id }, { _id: 1 })
                 if (sponsorUser) {
                     responseData.msg = "Sponsor ID Verified Successfully!"
@@ -1104,7 +1104,7 @@ module.exports = {
             // If a valid referral ID is provided, find the referring user
             if (trace_id) {
                 // First check if it's a sponsor ID
-                if (trace_id.startsWith('HS') || trace_id.startsWith('SI')) {
+                if (trace_id.startsWith('NB') || trace_id.startsWith('SI')) {
                     let sponsorUser = await userDbHandler.getOneByQuery({ sponsorID: trace_id }, { _id: 1 });
                     if (sponsorUser) {
                         refer_id = sponsorUser._id;
@@ -1237,7 +1237,7 @@ module.exports = {
 
             if (trace_id) {
                 // First check if it's a sponsor ID
-                if (trace_id.startsWith('HS') || trace_id.startsWith('SI')) {
+                if (trace_id.startsWith('NB') || trace_id.startsWith('SI')) {
                     let sponsorUser = await userDbHandler.getOneByQuery({ sponsorID: trace_id }, { _id: 1 });
                     if (sponsorUser) {
                         refer_id = sponsorUser._id;

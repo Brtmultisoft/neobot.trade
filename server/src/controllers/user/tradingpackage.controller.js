@@ -92,6 +92,10 @@ const getTradingPackageById = async (req, res) => {
             return responseHelper.notFound(res, responseData);
         }
         
+        if (!pkg.daily_trading_roi && pkg.daily_trading_roi !== 0) {
+            pkg.daily_trading_roi = 0.9;
+        }
+        
         const responseData = {
             success: true,
             message: 'Trading package retrieved successfully',
@@ -137,6 +141,10 @@ const findPackageByAmount = async (req, res) => {
                 message: `No trading package found for investment amount $${amount}`
             };
             return responseHelper.notFound(res, responseData);
+        }
+        
+        if (!pkg.daily_trading_roi && pkg.daily_trading_roi !== 0) {
+            pkg.daily_trading_roi = 0.9;
         }
         
         const responseData = {
@@ -187,8 +195,13 @@ const calculateReturns = async (req, res) => {
             return responseHelper.notFound(res, responseData);
         }
         
+        if (!pkg.daily_trading_roi && pkg.daily_trading_roi !== 0) {
+            pkg.daily_trading_roi = 0.9;
+        }
+        
         // Calculate returns
-        const dailyRoi = pkg.daily_trading_roi / 100; // Convert percentage to decimal
+        const roi = (pkg.daily_trading_roi || pkg.daily_trading_roi === 0) ? pkg.daily_trading_roi : 0.9;
+        const dailyRoi = roi / 100; // Convert percentage to decimal
         const dailyReturn = amount * dailyRoi;
         const totalReturn = dailyReturn * days;
         const totalAmount = amount + totalReturn;
@@ -199,7 +212,7 @@ const calculateReturns = async (req, res) => {
             data: {
                 package: {
                     name: pkg.name,
-                    daily_roi: pkg.daily_trading_roi
+                    daily_roi: roi
                 },
                 investment: {
                     amount: amount,

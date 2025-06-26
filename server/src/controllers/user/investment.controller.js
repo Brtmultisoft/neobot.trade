@@ -278,7 +278,10 @@ module.exports = {
 
             // Process referral bonus if user has a referrer
             try {
-
+                // --- REFERRAL BONUS LOGIC ---
+                // IMPORTANT: Referral bonus is given ONLY ONCE per referred user (on their first investment).
+                // This check ensures that the referrer gets a bonus only for the first investment of each referred user.
+                // DO NOT REMOVE this check, otherwise duplicate bonuses may be given for the same user.
                 if (!user.refer_id) {
                     console.log('No referrer ID found. Skipping referral bonus.');
                 } else {

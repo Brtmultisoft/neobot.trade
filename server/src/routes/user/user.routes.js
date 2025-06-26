@@ -610,6 +610,24 @@ module.exports = () => {
     const notificationRoutes = require('./notification.routes');
     Router.use('/notifications', notificationRoutes);
 
+    // Add this after userAuthenticateMiddleware is applied
+    Router.get('/user/active-rewards', async (req, res) => {
+        try {
+            const rewards = await RewardMaster.find({ active: true });
+            return res.status(200).json({
+                status: true,
+                message: 'Active rewards fetched successfully',
+                result: rewards
+            });
+        } catch (error) {
+            return res.status(500).json({
+                status: false,
+                message: 'Failed to fetch active rewards',
+                error: error.message
+            });
+        }
+    });
+
     /**************************
      * END OF AUTHORIZED ROUTES
      **************************/

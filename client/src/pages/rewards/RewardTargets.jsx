@@ -20,16 +20,27 @@ import {
   TrendingUp as TrendingUpIcon,
   CalendarToday as CalendarIcon,
   CardGiftcard as GiftIcon,
-  Star as StarIcon
+  Star as StarIcon,
+  AttachMoney as AttachMoneyIcon,
+  SwapHoriz as SwapHorizIcon,
+  People as PeopleIcon
 } from '@mui/icons-material';
 import { safeUserRewardService, rewardUtils } from '../../services/reward.service';
+import RewardService from '../../services/reward.service';
 
 const RewardTargets = () => {
   const [userProgress, setUserProgress] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [rewardMasters, setRewardMasters] = useState([]);
 
   useEffect(() => {
     fetchUserProgress();
+    fetchRewardMasters();
+    const interval = setInterval(() => {
+      fetchUserProgress();
+      fetchRewardMasters();
+    }, 30000); // 30 seconds
+    return () => clearInterval(interval);
   }, []);
 
   const fetchUserProgress = async () => {
@@ -60,7 +71,18 @@ const RewardTargets = () => {
     }
   };
 
-
+  const fetchRewardMasters = async () => {
+    try {
+      const res = await safeUserRewardService.getActiveRewards();
+      if (res?.status && Array.isArray(res.result)) {
+        setRewardMasters(res.result);
+      } else {
+        setRewardMasters([]);
+      }
+    } catch (err) {
+      setRewardMasters([]);
+    }
+  };
 
   if (loading) {
     return (
@@ -83,41 +105,68 @@ const RewardTargets = () => {
       </Box>
 
       {/* Current Status Summary */}
-      <Card sx={{ mb: 4, background: 'linear-gradient(135deg, #f5f5f5 0%, #e3f2fd 100%)', border: '2px solid #2196f3' }}>
-        <CardContent>
-          <Typography variant="h5" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <TrendingUpIcon sx={{ color: 'primary.main' }} />
+      <Card sx={{ mb: 4, borderRadius: 3, boxShadow: 2, overflow: 'visible' }}>
+        <Box
+          sx={{
+            background: 'linear-gradient(90deg, #2196f3 0%, #21cbf3 100%)',
+            borderTopLeftRadius: 12,
+            borderTopRightRadius: 12,
+            px: 3,
+            py: 2.5,
+            boxShadow: 2,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+          }}
+        >
+          <TrendingUpIcon sx={{ color: 'white', fontSize: 32 }} />
+          <Typography
+            variant="h5"
+            fontWeight="bold"
+            sx={{ color: 'white', letterSpacing: 1, fontSize: { xs: '1.2rem', md: '1.5rem' } }}
+          >
             Your Current Progress
           </Typography>
+        </Box>
+        <CardContent>
           <Grid container spacing={2}>
             <Grid item xs={12} md={4}>
               <Box textAlign="center">
-                <Typography variant="h4" color="success.main" fontWeight="bold">
+                <Typography variant="h4" fontWeight="bold" sx={{ color: '#43e97b', mb: 0.5 }}>
                   ${(userProgress?.current_self_investment || 0).toLocaleString()}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Self Investment
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                  <AttachMoneyIcon sx={{ color: '#43e97b' }} />
+                  <Typography variant="body2" color="text.secondary">
+                    Self Investment
+                  </Typography>
+                </Box>
               </Box>
             </Grid>
             <Grid item xs={12} md={4}>
               <Box textAlign="center">
-                <Typography variant="h4" color="primary" fontWeight="bold">
+                <Typography variant="h4" fontWeight="bold" sx={{ color: '#2196f3', mb: 0.5 }}>
                   ${(userProgress?.current_direct_business || 0).toLocaleString()}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Direct Business
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                  <SwapHorizIcon sx={{ color: '#2196f3' }} />
+                  <Typography variant="body2" color="text.secondary">
+                    Direct Business
+                  </Typography>
+                </Box>
               </Box>
             </Grid>
             <Grid item xs={12} md={4}>
               <Box textAlign="center">
-                <Typography variant="h4" color="secondary" fontWeight="bold">
+                <Typography variant="h4" fontWeight="bold" sx={{ color: '#ff9800', mb: 0.5 }}>
                   {userProgress?.direct_referrals_count || 0}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Direct Referrals
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                  <PeopleIcon sx={{ color: '#ff9800' }} />
+                  <Typography variant="body2" color="text.secondary">
+                    Direct Referrals
+                  </Typography>
+                </Box>
               </Box>
             </Grid>
           </Grid>
@@ -126,152 +175,70 @@ const RewardTargets = () => {
 
       {/* Reward Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        {/* Goa Tour Card */}
-        <Grid item xs={12} lg={6}>
-          <Card sx={{ border: '2px solid orange', height: '100%' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <MapPinIcon sx={{ color: 'orange', fontSize: 32 }} />
-                  <Typography variant="h5" fontWeight="bold">Goa Tour</Typography>
+        {rewardMasters.filter(r => r.active).map((reward) => (
+          <Grid item xs={12} lg={6} key={reward._id}>
+            <Card sx={{ border: '2px solid orange', height: '100%' }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <GiftIcon sx={{ color: 'orange', fontSize: 32 }} />
+                    <Box>
+                      <Typography variant="h5" fontWeight="bold">{reward.reward_name}</Typography>
+                      {reward.reward_type && (
+                        <Chip label={reward.reward_type} size="small" sx={{ mt: 0.5, ml: 0.5, fontSize: 12, background: '#f5f5f5' }} />
+                      )}
+                    </Box>
+                  </Box>
+                  <Chip
+                    label={userProgress && userProgress[reward.reward_name + '_qualified'] ? "Qualified" : "In Progress"}
+                    color={userProgress && userProgress[reward.reward_name + '_qualified'] ? "success" : "default"}
+                  />
                 </Box>
-                <Chip
-                  label={userProgress?.goa_qualified ? "Qualified" : "In Progress"}
-                  color={userProgress?.goa_qualified ? "success" : "default"}
-                />
-              </Box>
-
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Experience the beautiful beaches and culture of Goa
-              </Typography>
-
-              {/* Self Investment Progress */}
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="body2" fontWeight="medium" sx={{ mb: 1 }}>
-                  Self Investment: ${(userProgress?.current_self_investment || 0).toLocaleString()} / $1,000
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                  {reward.description || 'Achieve the targets to qualify for this reward.'}
                 </Typography>
-                <LinearProgress
-                  variant="determinate"
-                  value={Math.min(((userProgress?.current_self_investment || 0) / 1000) * 100, 100)}
-                  sx={{ height: 8, borderRadius: 4 }}
-                />
-              </Box>
-
-              {/* Direct Business Progress */}
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="body2" fontWeight="medium" sx={{ mb: 1 }}>
-                  Direct Business: ${(userProgress?.current_direct_business || 0).toLocaleString()} / $1,500
-                </Typography>
-                <LinearProgress
-                  variant="determinate"
-                  value={Math.min(((userProgress?.current_direct_business || 0) / 1500) * 100, 100)}
-                  sx={{ height: 8, borderRadius: 4 }}
-                />
-              </Box>
-
-              {userProgress?.goa_qualified ? (
-                <Alert severity="success">
-                  <Typography variant="body2">
-                    🎉 Congratulations! You're qualified for the Goa Tour!
+                {/* Self Investment Progress */}
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" fontWeight="medium" sx={{ mb: 1 }}>
+                    Self Investment: ${(userProgress?.current_self_investment || 0).toLocaleString()} / ${reward.self_invest_target}
                   </Typography>
-                </Alert>
-              ) : (
-                <Alert severity="info">
-                  <Typography variant="body2">
-                    Keep investing and building your team to qualify for this amazing reward!
-                  </Typography>
-                </Alert>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Bangkok Tour Card */}
-        <Grid item xs={12} lg={6}>
-          <Card sx={{ border: '2px solid blue', height: '100%' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <PlaneIcon sx={{ color: 'blue', fontSize: 32 }} />
-                  <Typography variant="h5" fontWeight="bold">Bangkok Tour</Typography>
+                  <LinearProgress
+                    variant="determinate"
+                    value={Math.min(((userProgress?.current_self_investment || 0) / reward.self_invest_target) * 100, 100)}
+                    sx={{ height: 8, borderRadius: 4 }}
+                  />
                 </Box>
-                <Chip
-                  label={userProgress?.bangkok_qualified ? "Qualified" : "In Progress"}
-                  color={userProgress?.bangkok_qualified ? "success" : "default"}
-                />
-              </Box>
-
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Explore the vibrant city of Bangkok, Thailand
-              </Typography>
-
-              {/* Self Investment Progress */}
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="body2" fontWeight="medium" sx={{ mb: 1 }}>
-                  Self Investment: ${(userProgress?.current_self_investment || 0).toLocaleString()} / $5,000
-                </Typography>
-                <LinearProgress
-                  variant="determinate"
-                  value={Math.min(((userProgress?.current_self_investment || 0) / 5000) * 100, 100)}
-                  sx={{ height: 8, borderRadius: 4 }}
-                />
-              </Box>
-
-              {/* Direct Business Progress */}
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="body2" fontWeight="medium" sx={{ mb: 1 }}>
-                  Direct Business: ${(userProgress?.current_direct_business || 0).toLocaleString()} / $10,000
-                </Typography>
-                <LinearProgress
-                  variant="determinate"
-                  value={Math.min(((userProgress?.current_direct_business || 0) / 10000) * 100, 100)}
-                  sx={{ height: 8, borderRadius: 4 }}
-                />
-              </Box>
-
-              {userProgress?.bangkok_qualified ? (
-                <Alert severity="success">
-                  <Typography variant="body2">
-                    🎉 Congratulations! You're qualified for the Bangkok Tour!
+                {/* Direct Business Progress */}
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" fontWeight="medium" sx={{ mb: 1 }}>
+                    Direct Business: ${(userProgress?.current_direct_business || 0).toLocaleString()} / ${reward.direct_business_target}
                   </Typography>
-                </Alert>
-              ) : (
-                <Alert severity="info">
-                  <Typography variant="body2">
-                    Keep investing and building your team to qualify for this premium reward!
-                  </Typography>
-                </Alert>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
+                  <LinearProgress
+                    variant="determinate"
+                    value={Math.min(((userProgress?.current_direct_business || 0) / reward.direct_business_target) * 100, 100)}
+                    sx={{ height: 8, borderRadius: 4 }}
+                  />
+                </Box>
+                {userProgress && userProgress[reward.reward_name + '_qualified'] ? (
+                  <Alert severity="success">
+                    <Typography variant="body2">
+                      🎉 Congratulations! You're qualified for the {reward.reward_name}!
+                    </Typography>
+                  </Alert>
+                ) : (
+                  <Alert severity="info">
+                    <Typography variant="body2">
+                      Keep investing and building your team to qualify for this reward!
+                    </Typography>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
       </Grid>
 
-      {/* Motivation Section */}
-      <Card sx={{ background: 'linear-gradient(135deg, #f3e5f5 0%, #fce4ec 100%)', border: '1px solid #9c27b0' }}>
-        <CardContent sx={{ textAlign: 'center', py: 4 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mb: 2 }}>
-            <MapPinIcon sx={{ fontSize: 40, color: 'orange' }} />
-            <PlaneIcon sx={{ fontSize: 40, color: 'blue' }} />
-          </Box>
-          <Typography variant="h5" fontWeight="bold" color="secondary" sx={{ mb: 2 }}>
-            Start Your Journey Today!
-          </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-            These exclusive travel rewards are waiting for you. Build your investment and team to unlock amazing experiences.
-          </Typography>
-          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, flexWrap: 'wrap' }}>
-            <Button variant="contained" sx={{ bgcolor: 'orange', '&:hover': { bgcolor: '#e65100' } }}>
-              <MapPinIcon sx={{ mr: 1 }} />
-              Target Goa Tour
-            </Button>
-            <Button variant="contained" color="primary">
-              <PlaneIcon sx={{ mr: 1 }} />
-              Target Bangkok Tour
-            </Button>
-          </Box>
-        </CardContent>
-      </Card>
+
     </Box>
   );
 };

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -113,6 +113,9 @@ const Dashboard = () => {
   const [newsItems, setNewsItems] = useState([]);
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
   const [announcementsError, setAnnouncementsError] = useState(null);
+
+  const [lastDashboardFetch, setLastDashboardFetch] = useState(null);
+  const refreshTimeoutRef = useRef(null);
 
   // Fetch announcements from API
   const fetchAnnouncements = async () => {
@@ -234,14 +237,51 @@ const Dashboard = () => {
     handleShareMenuClose();
   };
 
-  // Handle manual refresh
+  // Helper: Check if dashboard data is stale (older than 5 minutes)
+  const isDashboardStale = () => {
+    if (!lastDashboardFetch) return true;
+    return (Date.now() - lastDashboardFetch) > 5 * 60 * 1000;
+  };
+
+  // Optimized fetch: only fetch if not loaded or stale
+  const ensureDashboardData = async () => {
+    if (!dashboardData || isDashboardStale()) {
+      await fetchDashboardData();
+      setLastDashboardFetch(Date.now());
+    }
+  };
+
+  // Optimized useEffect for dashboard data
+  useEffect(() => {
+    ensureDashboardData();
+    fetchCryptoPrices();
+    fetchAnnouncements();
+    checkDailyProfitStatus();
+    const priceRefreshInterval = setInterval(() => {
+      fetchCryptoPrices();
+    }, 60000);
+    const handleNotification = (event) => {
+      const { message, severity } = event.detail;
+      showSnackbar(message, severity);
+    };
+    document.addEventListener('showNotification', handleNotification);
+    return () => {
+      clearInterval(priceRefreshInterval);
+      document.removeEventListener('showNotification', handleNotification);
+    };
+  }, []);
+
+  // Debounced manual refresh
   const handleRefresh = () => {
+    if (refreshTimeoutRef.current) return; // Prevent spamming
     fetchDashboardData();
-    // Clear the crypto cache before fetching new prices
+    setLastDashboardFetch(Date.now());
     CryptoService.clearCache();
     fetchCryptoPrices();
-    // Refresh announcements
     fetchAnnouncements();
+    refreshTimeoutRef.current = setTimeout(() => {
+      refreshTimeoutRef.current = null;
+    }, 2000); // 2 seconds debounce
   };
 
   // Fetch cryptocurrency prices
@@ -336,60 +376,6 @@ const Dashboard = () => {
       setDailyProfitActivated(false);
     }
   };
-
-  // Fetch user data, crypto prices, and announcements on component mount
-  useEffect(() => {
-    fetchDashboardData(); // This will also fetch the latest user data
-    fetchCryptoPrices();
-    fetchAnnouncements(); // Fetch announcements from API
-    checkDailyProfitStatus(); // Check if daily profit is already activated
-
-    // Set up interval to refresh crypto prices every 60 seconds
-    const priceRefreshInterval = setInterval(() => {
-      fetchCryptoPrices();
-    }, 60000); // 60 seconds
-
-    // Add event listener for notifications from header component
-    const handleNotification = (event) => {
-      const { message, severity } = event.detail;
-      showSnackbar(message, severity);
-    };
-
-    document.addEventListener('showNotification', handleNotification);
-
-    // Clean up interval and event listener on component unmount
-    return () => {
-      clearInterval(priceRefreshInterval);
-      document.removeEventListener('showNotification', handleNotification);
-    };
-  }, []);
-
-  // // Sample chart data (replace with actual data from API)
-  // const earningsChartData = {
-  //   daily: Array.from({ length: 30 }, (_, i) => ({
-  //     date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000).toLocaleDateString(),
-  //     total: Math.random() * 100 + 50,
-  //     roi: Math.random() * 50 + 25,
-  //   })),
-  //   monthly: Array.from({ length: 12 }, (_, i) => ({
-  //     month: new Date(2023, i, 1).toLocaleDateString('en-US', { month: 'short' }),
-  //     total: Math.random() * 1000 + 500,
-  //     roi: Math.random() * 500 + 250,
-  //   })),
-  // };
-
-  // const teamGrowthData = {
-  //   daily: Array.from({ length: 30 }, (_, i) => ({
-  //     date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000).toLocaleDateString(),
-  //     direct: Math.floor(Math.random() * 3),
-  //     total: 10 + Math.floor(Math.random() * 5) + i,
-  //   })),
-  //   monthly: Array.from({ length: 12 }, (_, i) => ({
-  //     month: new Date(2023, i, 1).toLocaleDateString('en-US', { month: 'short' }),
-  //     direct: Math.floor(Math.random() * 10) + i,
-  //     total: 10 + Math.floor(Math.random() * 20) + i * 3,
-  //   })),
-  // };
 
   return (
     <Box sx={{ width: '100%' }}>

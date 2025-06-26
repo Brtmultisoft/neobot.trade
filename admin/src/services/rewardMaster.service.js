@@ -1,6 +1,6 @@
 import ApiService from './api.service';
 
-const BASE_URL = '/api/admin/reward-master';
+const BASE_URL = '/admin/reward-master';
 
 function getAdminToken() {
   return localStorage.getItem('admin_token');

@@ -3,39 +3,51 @@ const RewardMaster = require('./src/models/reward.master.model');
 
 const data = [
   {
-    reward_type: 'goa_tour',
-    reward_name: 'Goa Tour',
+    reward_name: "Goa Tour",
+    reward_value: "Goa Tour",
     self_invest_target: 1000,
     direct_business_target: 1500,
-    reward_value: 'Goa Tour Package'
+    description: "",
+    active: true,
+    extra: {}
   },
   {
-    reward_type: 'bangkok_tour',
-    reward_name: 'Bangkok Tour',
+    reward_name: "Bangkok Tour",
+    reward_value: "Bangkok Tour",
     self_invest_target: 2500,
     direct_business_target: 5000,
-    reward_value: 'Bangkok Tour Package'
+    description: "",
+    active: true,
+    extra: {}
   },
   {
-    reward_type: 'coupon_code',
-    reward_name: 'Coupon Code',
+    reward_name: "Coupon Code",
+    reward_value: "Coupon worth $500",
     self_invest_target: 500,
     direct_business_target: 800,
-    reward_value: 'Discount Coupon'
+    description: "",
+    active: true,
+    extra: {}
   },
   {
-    reward_type: 'car_reward',
-    reward_name: 'Car',
+    reward_name: "Car",
+    reward_value: "Car",
     self_invest_target: 10000,
     direct_business_target: 5000,
-    reward_value: 'Monthly Car Business'
+    description: "Monthly Business every month",
+    active: true,
+    extra: {
+      note: "Monthly Business every month"
+    }
   },
   {
-    reward_type: 'bike_reward',
-    reward_name: 'Book Your Bike',
+    reward_name: "Book Your Bike",
+    reward_value: "Bike",
     self_invest_target: 7000,
     direct_business_target: 4000,
-    reward_value: 'Bike Booking Reward'
+    description: "",
+    active: true,
+    extra: {}
   }
 ];
 
@@ -45,12 +57,12 @@ async function seed() {
   console.log('Connected to MongoDB');
 
   for (const item of data) {
-    const exists = await RewardMaster.findOne({ reward_type: item.reward_type });
+    const exists = await RewardMaster.findOne({ reward_name: item.reward_name });
     if (!exists) {
       await RewardMaster.create(item);
-      console.log('Inserted:', item.reward_type);
+      console.log('Inserted:', item.reward_name);
     } else {
-      console.log('Already exists:', item.reward_type);
+      console.log('Already exists:', item.reward_name);
     }
   }
 

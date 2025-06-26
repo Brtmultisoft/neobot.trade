@@ -163,51 +163,35 @@ export const DataProvider = ({ children }) => {
 
   // Initialize data on component mount
   useEffect(() => {
-    // Check if token exists before making API calls
     const token = localStorage.getItem('token');
-
     if (token) {
-      console.log('Token exists, fetching initial data');
-      // Fetch all data immediately on mount
-      fetchDashboardData();
+      console.log('Token exists, fetching user data');
       fetchUserData();
-      fetchTeamData();
-      fetchInvestmentData();
-      fetchIncomeData();
-
-      // Set up polling for automatic refresh (every 5 minutes - increased from 30 seconds)
-      const pollingInterval = setInterval(() => {
-        // Check token again before each poll
-        if (localStorage.getItem('token')) {
-          fetchDashboardData();
-          fetchUserData(); // Also refresh user data to get updated invitation code/sponsor ID
-        } else {
-          // Clear interval if token is gone
-          clearInterval(pollingInterval);
-        }
-      }, 300000); // 5 minutes in milliseconds (increased from 30000)
-
-      return () => clearInterval(pollingInterval);
     } else {
-      console.log('No token found, skipping data fetch');
+      console.log('No token found, skipping user data fetch');
     }
-  }, [fetchDashboardData, fetchUserData, fetchTeamData, fetchInvestmentData, fetchIncomeData]);
+  }, [fetchUserData]);
 
-  // Listen for data update events
+  // Listen for data update events, but only refresh relevant data
   useEffect(() => {
-
-    // Listen for investment-related actions
-    document.addEventListener('investmentCreated', refreshAllData);
-    document.addEventListener('investmentUpdated', refreshAllData);
-    document.addEventListener('transferCompleted', refreshAllData);
-
-    // Clean up event listeners
-    return () => {
-      document.removeEventListener('investmentCreated', refreshAllData);
-      document.removeEventListener('investmentUpdated', refreshAllData);
-      document.removeEventListener('transferCompleted', refreshAllData);
+    // Only refresh investments and dashboard on investment events
+    const handleInvestmentEvent = () => {
+      fetchInvestmentData();
+      fetchDashboardData();
     };
-  }, [refreshAllData]);
+    // Only refresh investments on transfer events
+    const handleTransferEvent = () => {
+      fetchInvestmentData();
+    };
+    document.addEventListener('investmentCreated', handleInvestmentEvent);
+    document.addEventListener('investmentUpdated', handleInvestmentEvent);
+    document.addEventListener('transferCompleted', handleTransferEvent);
+    return () => {
+      document.removeEventListener('investmentCreated', handleInvestmentEvent);
+      document.removeEventListener('investmentUpdated', handleInvestmentEvent);
+      document.removeEventListener('transferCompleted', handleTransferEvent);
+    };
+  }, [fetchInvestmentData, fetchDashboardData]);
 
   // Provide the context value
   const contextValue = {

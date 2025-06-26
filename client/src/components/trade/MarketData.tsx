@@ -20,9 +20,9 @@ const MarketData: React.FC<MarketDataProps> = ({ tradingActive, trades }) => {
         height: { xs: 'auto', sm: 450, md: 500 }, // Responsive height
         overflow: 'hidden',
         position: 'relative',
-        background: '#12151c',
+        background: theme.palette.background.paper,
         borderRadius: { xs: 0.5, sm: 1 },
-        border: '1px solid rgba(255, 255, 255, 0.05)',
+        border: `1px solid ${theme.palette.divider}`,
         minHeight: { xs: 350, sm: 400, md: 500 }, // Ensure minimum height on all devices
       }}
     >
@@ -45,7 +45,7 @@ const MarketData: React.FC<MarketDataProps> = ({ tradingActive, trades }) => {
           <Typography
             variant="body1"
             sx={{
-              color: 'rgba(255, 255, 255, 0.7)',
+              color: theme.palette.text.secondary,
               fontSize: { xs: '0.875rem', sm: '1rem' }
             }}
           >
@@ -86,12 +86,12 @@ const MarketData: React.FC<MarketDataProps> = ({ tradingActive, trades }) => {
             gap: { xs: '8px', sm: '12px', md: '15px' },
             padding: { xs: '8px 12px', sm: '10px 16px' },
             borderBottom: '1px solid rgba(255, 255, 255, 0.03)',
-            background: '#0d1017',
+            background: theme.palette.background.paper,
             position: 'sticky',
             top: 0,
             zIndex: 10,
             fontWeight: 500,
-            color: 'text.secondary',
+            color: theme.palette.text.secondary,
             textTransform: 'uppercase',
             fontSize: { xs: 10, sm: 11 },
             letterSpacing: { xs: 0.3, sm: 0.5 }
@@ -197,7 +197,7 @@ const MarketData: React.FC<MarketDataProps> = ({ tradingActive, trades }) => {
                 <Typography
                   variant="body2"
                   sx={{
-                    color: trade.m ? alpha('#0ecb81', 0.9) : alpha('#f6465d', 0.9),
+                    color: trade.m ? alpha(theme.palette.success.main, 0.9) : alpha(theme.palette.error.main, 0.9),
                     fontWeight: { xs: 600, sm: 500 },
                     fontSize: { xs: 10, sm: 12, md: 13 },
                     whiteSpace: 'nowrap'
@@ -234,7 +234,7 @@ const MarketData: React.FC<MarketDataProps> = ({ tradingActive, trades }) => {
                   sx={{
                     fontFamily: "'Roboto Mono', monospace",
                     fontWeight: { xs: 600, sm: 500 },
-                    color: trade.m ? alpha('#0ecb81', 0.9) : alpha('#f6465d', 0.9),
+                    color: trade.m ? alpha(theme.palette.success.main, 0.9) : alpha(theme.palette.error.main, 0.9),
                     fontSize: { xs: 10, sm: 12, md: 13 }
                   }}
                 >
@@ -302,7 +302,7 @@ const MarketData: React.FC<MarketDataProps> = ({ tradingActive, trades }) => {
             <Typography
               variant="body1"
               sx={{
-                color: 'text.secondary',
+                color: theme.palette.text.secondary,
                 fontSize: { xs: '0.875rem', sm: '1rem' }
               }}
             >

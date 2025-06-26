@@ -2,9 +2,7 @@ const mongoose = require('mongoose');
 
 const rewardMasterSchema = new mongoose.Schema({
   reward_type: {
-    type: String,
-    required: true,
-    unique: true // unique identifier (e.g., goa_tour, car_reward)
+    type: String, // optional now, no unique constraint
   },
   reward_name: {
     type: String,
@@ -38,6 +36,6 @@ const rewardMasterSchema = new mongoose.Schema({
   timestamps: true
 });
 
-rewardMasterSchema.index({ reward_type: 1 }, { unique: true });
+// ✅ Removed unique index on reward_type
 
 module.exports = mongoose.models.RewardMaster || mongoose.model('RewardMaster', rewardMasterSchema);

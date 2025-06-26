@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -77,6 +77,10 @@ const Register = () => {
   const [verificationEmail, setVerificationEmail] = useState('');
   const [verificationPhone, setVerificationPhone] = useState('');
 
+  // Referral checking states
+  const [referralChecking, setReferralChecking] = useState(false);
+  const referralDebounceRef = useRef();
+
   // Get referral code from URL if present and default referrer from env
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -103,10 +107,12 @@ const Register = () => {
         setReferralError(result.error);
         setReferralInfo(null);
       }
+      return result; // Ensure the result is returned for debounced effect
     } catch (err) {
       console.error('Error validating referral ID:', err);
       setReferralError('Error validating referral ID');
       setReferralInfo(null);
+      return { isValid: false, error: 'Error validating referral ID' }; // Return error object
     }
   };
 
@@ -186,14 +192,44 @@ const Register = () => {
           return !result.isValid ? result.message : null;
         },
       },
-      confirmPassword: {
-        required: true, // Confirm password always required
-        requiredMessage: 'Please confirm your password',
-      },
     };
   };
 
-
+  // Debounced real-time referral validation
+  useEffect(() => {
+    if (!referralCode) {
+      setReferralError('');
+      setReferralInfo(null);
+      setReferralChecking(false);
+      return;
+    }
+    setReferralChecking(true);
+    if (referralDebounceRef.current) clearTimeout(referralDebounceRef.current);
+    const codeToCheck = referralCode; // capture current value
+    referralDebounceRef.current = setTimeout(async () => {
+      try {
+        const result = await validateReferralId(codeToCheck);
+        // Only update if the value hasn't changed since the call started
+        if (referralCode === codeToCheck) {
+          if (result?.isValid) {
+            setReferralInfo(result.data);
+            setReferralError('');
+          } else {
+            setReferralError(result?.error || 'Invalid referral ID');
+            setReferralInfo(null);
+          }
+        }
+      } catch (err) {
+        if (referralCode === codeToCheck) {
+          setReferralError('Error validating referral ID');
+          setReferralInfo(null);
+        }
+      } finally {
+        if (referralCode === codeToCheck) setReferralChecking(false);
+      }
+    }, 500);
+    return () => clearTimeout(referralDebounceRef.current);
+  }, [referralCode]);
 
   // Dual verification functions
   const handleDualVerificationRegistration = async (userData, email, phone) => {
@@ -572,16 +608,15 @@ const Register = () => {
 
   // Custom handleChange function to validate confirmPassword when password changes
   const customHandleChange = (e) => {
-    const { name } = e.target;
+    const { name, value } = e.target;
+
+    // If referralCode is being changed, clear referralError immediately
+    if (name === 'referralCode') {
+      setReferralError('');
+    }
 
     // Call the original handleChange function
     handleChange(e);
-
-    // If password field is changed and confirmPassword has a value, validate confirmPassword
-    if (name === 'password' && values.confirmPassword) {
-      // Mark confirmPassword as touched to show validation error
-      setFieldTouched('confirmPassword', true);
-    }
   };
 
   // Initialize form
@@ -595,6 +630,7 @@ const Register = () => {
     handleSubmit,
     resetForm,
     setFieldTouched,
+    setFieldValue,
   } = useForm(
     {
       name: '',
@@ -602,10 +638,19 @@ const Register = () => {
       email: '',
       phone: '',
       password: '',
-      confirmPassword: '',
     },
     getValidationRules(), // Use dynamic validation rules
     async (formValues) => {
+      if (referralChecking) {
+        setShowSuccessAlert(true);
+        setSuccessMessage('Please wait for referral validation to complete.');
+        return;
+      }
+      if (referralError) {
+        setShowSuccessAlert(true);
+        setSuccessMessage('Invalid referral ID. Please use a valid referral ID.');
+        return;
+      }
       try {
         // Check referral ID validity first
         if (referralError) {
@@ -638,14 +683,13 @@ const Register = () => {
         const isMobileOnlyOTP = !otpSettings.email_otp_enabled && otpSettings.mobile_otp_enabled;
 
         // Proceed with registration
-        const { confirmPassword, phone, email, ...userData } = formValues;
+        const { phone, email, ...userData } = formValues;
 
         const finalUserData = {
           ...userData,
           email: email, // Add email back to userData
           phone_number: phone, // Add phone_number for consistency
           password: userData.password, // User must provide password
-          confirm_password: confirmPassword,
           referralId: referralCode || undefined, // Backend expects referralId, undefined if empty
         };
 
@@ -958,60 +1002,31 @@ const Register = () => {
           />
 
           <TextField
-            label="Confirm Password"
-            name="confirmPassword"
-            type={showConfirmPassword ? 'text' : 'password'}
-            value={values.confirmPassword}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            error={touched.confirmPassword && Boolean(errors.confirmPassword)}
-            helperText={touched.confirmPassword && errors.confirmPassword}
-            fullWidth
-            margin="normal"
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <LockIcon />
-                </InputAdornment>
-              ),
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    aria-label="toggle confirm password visibility"
-                    onClick={handleToggleConfirmPasswordVisibility}
-                    edge="end"
-                  >
-                    {showConfirmPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                  </IconButton>
-                </InputAdornment>
-              ),
-            }}
-          />
-
-          <TextField
             label="Referral ID"
+            name="referralCode"
             value={referralCode}
-            onChange={(e) => {
-              setReferralCode(e.target.value);
-              // Clear any previous error when user types
-              if (referralError) setReferralError('');
+            onChange={customHandleChange}
+            onBlur={() => validateReferralId(referralCode)}
+            error={!!referralError}
+            helperText={
+              referralError
+                ? referralError
+                : referralInfo && (referralInfo.name || referralInfo.username)
+                  ? `Referrer: ${referralInfo.name || referralInfo.username}`
+                  : referralChecking
+                    ? 'Checking referral ID...'
+                    : 'Enter a valid referral ID'
+            }
+            InputProps={{
+              endAdornment: referralChecking ? (
+                <InputAdornment position="end">
+                  <CircularProgress size={18} />
+                </InputAdornment>
+              ) : null,
             }}
-            onBlur={() => {
-              // Validate referral ID when field loses focus
-              if (referralCode) validateReferralId(referralCode);
-            }}
-            error={Boolean(referralError)}
-            helperText={referralError || 'Enter a valid referral ID'}
             fullWidth
             margin="normal"
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <BadgeIcon />
-                </InputAdornment>
-              ),
-            }}
-            sx={{ mb: 2 }}
+            required
           />
 
           {/* Navigation Buttons */}
@@ -1037,31 +1052,12 @@ const Register = () => {
               type="submit"
               variant="contained"
               color="primary"
-              disabled={loading || isSubmitting || otpLoading || dualOtpLoading || otpSettings.loading}
-              fullWidth={isMobile}
-              sx={{ width: isMobile ? '100%' : 'auto' }}
+              fullWidth
+              size="large"
+              sx={{ mt: 2, mb: 1 }}
+              disabled={isSubmitting || referralChecking}
             >
-              {loading || isSubmitting || otpLoading || dualOtpLoading ? (
-                <>
-                  <CircularProgress size={24} sx={{ mr: 1 }} color="inherit" />
-                  {(!otpSettings.email_otp_enabled && !otpSettings.mobile_otp_enabled)
-                    ? 'Creating Account...'
-                    : (otpSettings.email_otp_enabled && !otpSettings.mobile_otp_enabled)
-                      ? 'Sending Email Code...'
-                      : (!otpSettings.email_otp_enabled && otpSettings.mobile_otp_enabled)
-                        ? 'Sending Mobile Code...'
-                        : 'Sending Verification Codes...'
-                  }
-                </>
-              ) : (
-                (!otpSettings.email_otp_enabled && !otpSettings.mobile_otp_enabled)
-                  ? 'Create Account'
-                  : (otpSettings.email_otp_enabled && !otpSettings.mobile_otp_enabled)
-                    ? 'Send Email Code'
-                    : (!otpSettings.email_otp_enabled && otpSettings.mobile_otp_enabled)
-                      ? 'Send Mobile Code'
-                      : 'Send Verification Codes'
-              )}
+              {isSubmitting ? <CircularProgress size={24} /> : 'Register'}
             </Button>
           </Box>
 

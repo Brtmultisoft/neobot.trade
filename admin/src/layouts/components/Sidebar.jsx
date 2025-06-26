@@ -1675,164 +1675,60 @@ const Sidebar = ({ open, onClose }) => {
         <ListItem disablePadding>
           <Tooltip title="Reward Management" placement="right" disableHoverListener={!miniVariant || isMobile}>
             <ListItemButton
-              onClick={() => {
-                setRewardsOpen(!rewardsOpen);
-                // On mobile, close other sections when opening a new one
-                if (isMobile && !rewardsOpen) {
-                  setTeamOpen(false);
-                  setInvestmentOpen(false);
-                  setIncomeOpen(false);
-                  setWalletOpen(false);
-                  setAnnouncementsOpen(false);
-                  setTradingOpen(false);
-                }
-              }}
-              onTouchStart={() => handleTouchStart('reward-management')}
-              onTouchEnd={handleTouchEnd}
+              onClick={() => setRewardsOpen(!rewardsOpen)}
               sx={{
-                borderRadius: 1,
+                borderRadius: 2,
                 mb: 0.5,
-                justifyContent: miniVariant ? 'center' : 'flex-start',
-                minHeight: 48,
-                px: miniVariant ? 1 : 2.5,
-                // Mobile-specific styling for parent menu items
-                ...(isMobile && {
-                  backgroundColor: rewardsOpen
-                    ? alpha(theme.palette.primary.main, 0.08)
-                    : touchedItem === 'reward-management'
-                      ? alpha(theme.palette.primary.main, 0.05)
-                      : 'transparent',
-                  borderLeft: rewardsOpen ? `3px solid ${theme.palette.primary.main}` : '3px solid transparent',
-                  transition: 'all 0.2s ease',
-                }),
+                backgroundColor: rewardsOpen ? alpha(theme.palette.primary.main, 0.08) : 'transparent',
+                '&:hover': { backgroundColor: alpha(theme.palette.primary.main, 0.12) },
               }}
             >
-              <ListItemIcon
-                sx={{
-                  minWidth: 0,
-                  mr: miniVariant ? 0 : 2,
-                  justifyContent: 'center',
-                  // Larger icons on mobile for better touch targets
-                  ...(isMobile && {
-                    '& .MuiSvgIcon-root': {
-                      fontSize: '1.3rem',
-                    }
-                  })
-                }}
-              >
+              <ListItemIcon>
                 <EmojiEventsIcon color={rewardsOpen ? 'primary' : 'inherit'} />
               </ListItemIcon>
-              {!miniVariant && (
-                <>
-                  <ListItemText
-                    primary="Rewards"
-                    primaryTypographyProps={{
-                      fontWeight: rewardsOpen && isMobile ? 600 : 400,
-                      color: rewardsOpen && isMobile ? theme.palette.primary.main : 'inherit'
-                    }}
-                  />
-                  {rewardsOpen ? <ExpandLess color={isMobile ? "primary" : "inherit"} /> : <ExpandMore />}
-                </>
-              )}
+              {!miniVariant && <ListItemText primary="Rewards" />}
+              {rewardsOpen ? <ExpandLess /> : <ExpandMore />}
             </ListItemButton>
           </Tooltip>
         </ListItem>
         <Collapse in={rewardsOpen && !miniVariant} timeout="auto" unmountOnExit>
-          <List
-            component="div"
-            disablePadding
-            sx={{
-              // Mobile-specific styling for nested lists
-              ...(isMobile && {
-                backgroundColor: alpha(theme.palette.primary.main, 0.03),
-                borderRadius: 1,
-                my: 0.5,
-                mx: 1,
-              })
-            }}
-          >
-            {/* <Tooltip title="Reward Tracking" placement="right" disableHoverListener={!miniVariant || isMobile}>
-              <ListItemButton
-                component={Link}
-                to="/rewards"
-                selected={isActive('/rewards')}
-                onClick={() => handleItemClick('reward-tracking')}
-                onTouchStart={() => handleTouchStart('reward-tracking')}
-                onTouchEnd={handleTouchEnd}
-                sx={{
-                  pl: miniVariant ? 1 : isMobile ? 3 : 4,
-                  borderRadius: 1,
-                  mb: 0.5,
-                  justifyContent: miniVariant ? 'center' : 'flex-start',
-                  minHeight: isMobile ? 48 : 40,
-                  // Mobile-specific styling
-                  ...(isMobile && {
-                    borderLeft: `3px solid ${isActive('/rewards') ? theme.palette.primary.main : 'transparent'}`,
-                    transition: 'all 0.2s ease',
-                    backgroundColor: touchedItem === 'reward-tracking' ? alpha(theme.palette.primary.main, 0.15) : 'transparent',
-                  }),
-                  '&.Mui-selected': {
-                    backgroundColor: `${theme.palette.primary.main}20`,
-                    '&:hover': {
-                      backgroundColor: `${theme.palette.primary.main}30`,
-                    },
-                  },
-                }}
-              >
-                <ListItemIcon
-                  sx={{
-                    minWidth: 0,
-                    mr: miniVariant ? 0 : 2,
-                    justifyContent: 'center',
-                  }}
-                >
-                  <EmojiEventsIcon
-                    color={isActive('/rewards') ? 'primary' : 'inherit'}
-                    fontSize="small"
-                  />
-                </ListItemIcon>
-                {!miniVariant && <ListItemText primary="Reward Tracking" />}
-              </ListItemButton>
-            </Tooltip>
-            <Tooltip title="Reward Master List" placement="right" disableHoverListener={!miniVariant || isMobile}>
-              <ListItemButton
-                component={Link}
-                to="/reward-master-list"
-                selected={isActive('/reward-master-list')}
-                onClick={() => handleItemClick('reward-master-list')}
-                onTouchStart={() => handleTouchStart('reward-master-list')}
-                onTouchEnd={handleTouchEnd}
-                sx={{
-                  pl: miniVariant ? 1 : isMobile ? 3 : 4,
-                  borderRadius: 1,
-                  mb: 0.5,
-                  justifyContent: miniVariant ? 'center' : 'flex-start',
-                  minHeight: isMobile ? 48 : 40,
-                  ...(isMobile && {
-                    borderLeft: `3px solid ${isActive('/reward-master-list') ? theme.palette.primary.main : 'transparent'}`,
-                    transition: 'all 0.2s ease',
-                    backgroundColor: touchedItem === 'reward-master-list' ? alpha(theme.palette.primary.main, 0.15) : 'transparent',
-                  }),
-                  '&.Mui-selected': {
-                    backgroundColor: `${theme.palette.primary.main}20`,
-                    '&:hover': {
-                      backgroundColor: `${theme.palette.primary.main}30`,
-                    },
-                  },
-                }}
-              >
-                <ListItemIcon
-                  sx={{
-                    minWidth: 0,
-                    mr: miniVariant ? 0 : 2,
-                    justifyContent: 'center',
-                  }}
-                >
-                  <BusinessCenterIcon color={isActive('/reward-master-list') ? 'primary' : 'inherit'} fontSize="small" />
-                </ListItemIcon>
-                {!miniVariant && <ListItemText primary="Reward Master List" />}
-              </ListItemButton>
-            </Tooltip> */}
+          <List component="div" disablePadding>
+            <ListItemButton
+              component={Link}
+              to="/reward-master-list"
+              selected={isActive('/reward-master-list')}
+              onClick={() => handleItemClick('reward-master-list')}
+              sx={{ pl: 4, borderRadius: 2, mb: 0.5 }}
+            >
+              <ListItemIcon sx={{ minWidth: 36 }}>
+                <BusinessCenterIcon color={isActive('/reward-master-list') ? 'primary' : 'inherit'} fontSize="small" />
+              </ListItemIcon>
+              {!miniVariant && <ListItemText primary="Reward Master List" />}
+            </ListItemButton>
+            <ListItemButton
+              component={Link}
+              to="/reward-eligible-users"
+              selected={isActive('/reward-eligible-users')}
+              onClick={() => handleItemClick('reward-eligible-users')}
+              sx={{ pl: 4, borderRadius: 2, mb: 0.5 }}
+            >
+              <ListItemIcon sx={{ minWidth: 36 }}>
+                <PeopleIcon color={isActive('/reward-eligible-users') ? 'primary' : 'inherit'} fontSize="small" />
+              </ListItemIcon>
+              {!miniVariant && <ListItemText primary="Eligible Users" />}
+            </ListItemButton>
+            <ListItemButton
+              component={Link}
+              to="/reward-all-data"
+              selected={isActive('/reward-all-data')}
+              onClick={() => handleItemClick('reward-all-data')}
+              sx={{ pl: 4, borderRadius: 2, mb: 0.5 }}
+            >
+              <ListItemIcon sx={{ minWidth: 36 }}>
+                <MonetizationOnIcon color={isActive('/reward-all-data') ? 'primary' : 'inherit'} fontSize="small" />
+              </ListItemIcon>
+              {!miniVariant && <ListItemText primary="All Rewards Data" />}
+            </ListItemButton>
           </List>
         </Collapse>
 
@@ -2325,6 +2221,42 @@ const Sidebar = ({ open, onClose }) => {
             </Tooltip>
           </Box>
         )}
+
+        {/* Reward Master Management */}
+        {/* <ListItem disablePadding>
+          <Tooltip title="Reward Master" placement="right" disableHoverListener={!miniVariant}>
+            <ListItemButton
+              component={Link}
+              to="/reward-master"
+              selected={isActive('/reward-master')}
+              onClick={handleItemClick}
+              sx={{
+                borderRadius: 1,
+                mb: 0.5,
+                justifyContent: miniVariant ? 'center' : 'flex-start',
+                minHeight: 48,
+                px: miniVariant ? 1 : 2.5,
+                '&.Mui-selected': {
+                  backgroundColor: `${theme.palette.primary.main}20`,
+                  '&:hover': {
+                    backgroundColor: `${theme.palette.primary.main}30`,
+                  },
+                },
+              }}
+            >
+              <ListItemIcon
+                sx={{
+                  minWidth: 0,
+                  mr: miniVariant ? 0 : 2,
+                  justifyContent: 'center',
+                }}
+              >
+                <EmojiEventsIcon color={isActive('/reward-master') ? 'primary' : 'inherit'} />
+              </ListItemIcon>
+              {!miniVariant && <ListItemText primary="Reward Master" />}
+            </ListItemButton>
+          </Tooltip>
+        </ListItem> */}
       </List>
     </Box>
   );

@@ -379,6 +379,17 @@ export const userRewardService = {
       console.warn('Direct referrals API error:', error);
       return { data: [] };
     }
+  },
+
+  // Get all active rewards for the user
+  getActiveRewards: async () => {
+    try {
+      const response = await api.get('/user/active-rewards');
+      return response.data || response;
+    } catch (error) {
+      console.warn('Active rewards API not available:', error);
+      return { data: [] };
+    }
   }
 };
 

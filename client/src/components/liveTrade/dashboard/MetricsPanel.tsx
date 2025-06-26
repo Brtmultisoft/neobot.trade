@@ -5,14 +5,16 @@ import MetricCard from './MetricCard';
 interface MetricsPanelProps {
   btcPrice: number;
   totalInvestment: number;
+  roiRate?: number | null;
+  dailyProfitAmount?: number | null;
 }
 
 const MetricsPanel: React.FC<MetricsPanelProps> = ({
   btcPrice,
-  totalInvestment
+  totalInvestment,
+  roiRate,
+  dailyProfitAmount
 }) => {
-  const dailyProfit = totalInvestment * 0.025;
-
   return (
     <Box mb={6}>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
@@ -34,8 +36,8 @@ const MetricsPanel: React.FC<MetricsPanelProps> = ({
 
         <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 45%', lg: '1 1 30%' } }}>
           <MetricCard
-            title="DAILY PROFIT"
-            value={`$${dailyProfit.toFixed(2)}`}
+            title={`DAILY PROFIT (${typeof roiRate === 'number' && !isNaN(roiRate) ? roiRate + '%' : '0%'})`}
+            value={`$${typeof dailyProfitAmount === 'number' && !isNaN(dailyProfitAmount) ? dailyProfitAmount.toFixed(2) : '0.00'}`}
             color="green"
           />
         </Box>

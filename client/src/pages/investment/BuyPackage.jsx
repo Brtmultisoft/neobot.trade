@@ -25,7 +25,7 @@ import { formatCurrency } from '../../utils/formatters';
 import useApi from '../../hooks/useApi';
 import InvestmentService from '../../services/investment.service';
 import TradingPackageService from '../../services/tradingpackage.service';
-import useAuth from '../../hooks/useAuth';
+import UserService from '../../services/user.service';
 import Swal from 'sweetalert2';
 import { useNavigate } from 'react-router-dom';
 import { useTheme as useAppTheme } from '../../context/ThemeContext';
@@ -34,7 +34,8 @@ const BuyPackage = () => {
   const theme = useTheme();
   const { mode } = useAppTheme();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const [user, setUser] = useState(null);
+  const [userLoading, setUserLoading] = useState(true);
   const [amount, setAmount] = useState('');
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [error, setError] = useState('');
@@ -42,6 +43,19 @@ const BuyPackage = () => {
   const [showAmountInput, setShowAmountInput] = useState(false);
   const [favorite, setFavorite] = useState(false);
 
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const res = await UserService.getUserProfile();
+        setUser(res.data || res.result || res);
+      } catch (err) {
+        setUser(null);
+      } finally {
+        setUserLoading(false);
+      }
+    };
+    fetchUser();
+  }, []);
 
   // Fetch trading packages from API
   const {
@@ -123,8 +137,6 @@ const BuyPackage = () => {
     }
   }, [packagesData]);
 
-
-
   const handlePlanSelect = (plan) => {
     setSelectedPlan(plan);
     setAmount('');
@@ -189,6 +201,13 @@ const BuyPackage = () => {
         package_id: selectedPlan._id,
         daily_profit: selectedPlan.daily_trading_roi
       });
+
+      console.log('Referral bonus check:', {
+        referrer_id: referrer._id,
+        referred_user_id: user_id,
+        referrer_total_investment: referrer.total_investment,
+        existingReferralBonus
+      });
     } catch (error) {
       console.error('Investment error:', error);
 
@@ -239,8 +258,6 @@ const BuyPackage = () => {
     setFavorite(!favorite);
   };
 
-
-
   // Get packages data from API response with proper structure handling
   const apiPackages = packagesData?.data || packagesData?.result || [];
 
@@ -287,10 +304,26 @@ const BuyPackage = () => {
   // Use API packages if available, otherwise use fallback
   const packages = apiPackages.length > 0 ? apiPackages : fallbackPackages;
 
+  // 1. Calculate monthly ROI for each plan
+  const getMonthlyRoi = (plan) => {
+    if (plan.extra?.monthly_roi) return plan.extra.monthly_roi;
+    return plan.daily_trading_roi * 30;
+  };
 
-
-  
-
+  if (userLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+  if (!user) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <Alert severity="error">Failed to load user data. Please try again.</Alert>
+      </Box>
+    );
+  }
   return (
     <Box sx={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
@@ -460,8 +493,6 @@ const BuyPackage = () => {
               }}
             />
           </Box>
-
-
         </Box>
 
         {/* Package title overlay with animation */}
@@ -515,7 +546,7 @@ const BuyPackage = () => {
                   textShadow: 'none',
                 }}
               >
-                {showAmountInput && selectedPlan?.daily_trading_roi ? `${selectedPlan.daily_trading_roi}% Daily ROI` : 'Start Your Investment Journey'}
+                {showAmountInput && selectedPlan?.daily_trading_roi ? `${getMonthlyRoi(selectedPlan).toFixed(2)}% Monthly ROI` : 'Start Your Investment Journey'}
               </Typography>
             </Box>
           </Typography>
@@ -720,7 +751,7 @@ const BuyPackage = () => {
                               mb: 0.5,
                             }}
                           >
-                            {plan.daily_trading_roi}%
+                            {getMonthlyRoi(plan).toFixed(2)}%
                           </Typography>
                           <Typography
                             variant="caption"
@@ -731,7 +762,7 @@ const BuyPackage = () => {
                               display: 'block',
                             }}
                           >
-                            Daily ROI
+                            Monthly ROI
                           </Typography>
                         </Box>
                       </Box>
@@ -1147,8 +1178,6 @@ const BuyPackage = () => {
               placeholder={`Min: ${formatCurrency(selectedPlan?.trading_amount_from || 0)}`}
             />
 
-
-
             {/* ROI Calculations */}
             {amount && parseFloat(amount) > 0 && (
               <Box
@@ -1183,35 +1212,13 @@ const BuyPackage = () => {
                   <Grid item xs={12} sm={6}>
                     <Box sx={{ textAlign: 'center', p: 2, borderRadius: 2, backgroundColor: mode === 'dark' ? 'rgba(0,0,0,0.2)' : 'rgba(255, 255, 255, 0.8)' }}>
                       <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold' }}>
-                        Daily ROI
-                      </Typography>
-                      <Typography variant="h5" fontWeight="bold" sx={{ color: '#0ECB81', mb: 0.5 }}>
-                        {selectedPlan?.daily_trading_roi}%
-                      </Typography>
-                      <Typography variant="body2" fontWeight="bold" sx={{ color: '#0ECB81' }}>
-                        {formatCurrency(parseFloat(amount) * (selectedPlan?.daily_trading_roi / 100))}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        per day
-                      </Typography>
-                      {selectedPlan?.extra?.monthly_roi && (
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, fontStyle: 'italic' }}>
-                          (From {selectedPlan.extra.monthly_roi}% monthly)
-                        </Typography>
-                      )}
-                    </Box>
-                  </Grid>
-
-                  <Grid item xs={12} sm={6}>
-                    <Box sx={{ textAlign: 'center', p: 2, borderRadius: 2, backgroundColor: mode === 'dark' ? 'rgba(0,0,0,0.2)' : 'rgba(255, 255, 255, 0.8)' }}>
-                      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold' }}>
                         Monthly Returns
                       </Typography>
                       <Typography variant="h5" fontWeight="bold" sx={{ color: '#0ECB81', mb: 0.5 }}>
-                        {selectedPlan?.extra?.monthly_roi ? selectedPlan.extra.monthly_roi.toFixed(2) : (selectedPlan?.daily_trading_roi * 30).toFixed(1)}%
+                        {getMonthlyRoi(selectedPlan).toFixed(2)}%
                       </Typography>
                       <Typography variant="body2" fontWeight="bold" sx={{ color: '#0ECB81' }}>
-                        {formatCurrency(parseFloat(amount) * (selectedPlan?.daily_trading_roi / 100) * 30)}
+                        {formatCurrency(parseFloat(amount) * (getMonthlyRoi(selectedPlan) / 100))}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         in 30 days
@@ -1230,13 +1237,10 @@ const BuyPackage = () => {
                       }}
                     >
                       <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold' }}>
-                        Total After 1 Year
+                        Total Investment
                       </Typography>
                       <Typography variant="h4" fontWeight="bold" sx={{ color: '#0ECB81', mb: 0.5 }}>
-                        {formatCurrency(parseFloat(amount) + (parseFloat(amount) * (selectedPlan?.daily_trading_roi / 100) * 365))}
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: '#0ECB81', fontWeight: 'medium' }}>
-                        Investment: {formatCurrency(parseFloat(amount))} + Returns: {formatCurrency(parseFloat(amount) * (selectedPlan?.daily_trading_roi / 100) * 365)}
+                        {formatCurrency(parseFloat(amount))}
                       </Typography>
                     </Box>
                   </Grid>
@@ -1261,8 +1265,6 @@ const BuyPackage = () => {
                 {formatCurrency(user?.wallet_topup || 0)}
               </Typography>
             </Box>
-
-
           </Paper>
         )}
 
@@ -1561,30 +1563,6 @@ const BuyPackage = () => {
                   </Grid>
                   <Grid item xs={6}>
                     <Typography variant="caption" color="text.secondary">
-                      Daily ROI Rate
-                    </Typography>
-                    <Typography
-                      variant="body1"
-                      fontWeight="bold"
-                      sx={{ color: '#0ECB81' }}
-                    >
-                      {selectedPlan?.daily_trading_roi}%
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Typography variant="caption" color="text.secondary">
-                      Daily Return Amount
-                    </Typography>
-                    <Typography
-                      variant="body1"
-                      fontWeight="bold"
-                      sx={{ color: '#0ECB81' }}
-                    >
-                      {formatCurrency(selectedPlan && amount ? (parseFloat(amount) * (selectedPlan.daily_trading_roi / 100)) : 0)}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Typography variant="caption" color="text.secondary">
                       Monthly Returns
                     </Typography>
                     <Typography
@@ -1592,19 +1570,19 @@ const BuyPackage = () => {
                       fontWeight="bold"
                       sx={{ color: '#0ECB81' }}
                     >
-                      {formatCurrency(selectedPlan && amount ? (parseFloat(amount) * (selectedPlan.daily_trading_roi / 100) * 30) : 0)}
+                      {getMonthlyRoi(selectedPlan).toFixed(2)}%
                     </Typography>
                   </Grid>
                   <Grid item xs={6}>
                     <Typography variant="caption" color="text.secondary">
-                      Yearly Returns
+                      Monthly Return Amount
                     </Typography>
                     <Typography
                       variant="body1"
                       fontWeight="bold"
                       sx={{ color: '#0ECB81' }}
                     >
-                      {formatCurrency(selectedPlan && amount ? (parseFloat(amount) * (selectedPlan.daily_trading_roi / 100) * 365) : 0)}
+                      {formatCurrency(parseFloat(amount) * (getMonthlyRoi(selectedPlan) / 100))}
                     </Typography>
                   </Grid>
                 </Grid>

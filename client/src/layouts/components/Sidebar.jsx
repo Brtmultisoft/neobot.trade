@@ -798,13 +798,21 @@ const Sidebar = ({ open, onClose }) => {
         {/* Rewards */}
         <ListItem disablePadding sx={{ mb: 0.5 }}>
           <ListItemButton
-            onClick={handleRewardsClick}
+            component={Link}
+            to="/rewards/targets"
+            selected={isActive('/rewards/targets')}
+            onClick={handleItemClick}
             sx={{
               borderRadius: 2,
               transition: 'all 0.2s ease',
-              backgroundColor: rewardsOpen ? 'rgba(255, 193, 7, 0.08)' : 'transparent',
+              '&.Mui-selected': {
+                backgroundColor: 'rgba(51, 117, 187, 0.08)',
+                '&:hover': {
+                  backgroundColor: 'rgba(51, 117, 187, 0.12)',
+                },
+              },
               '&:hover': {
-                backgroundColor: 'rgba(255, 193, 7, 0.05)',
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
               },
             }}
           >
@@ -817,8 +825,8 @@ const Sidebar = ({ open, onClose }) => {
                   alignItems: 'center',
                   justifyContent: 'center',
                   borderRadius: '8px',
-                  backgroundColor: rewardsOpen ? 'rgba(255, 193, 7, 0.12)' : 'transparent',
-                  color: rewardsOpen ? '#ff9800' : theme.palette.text.secondary,
+                  backgroundColor: isActive('/rewards/targets') ? 'rgba(51, 117, 187, 0.12)' : 'transparent',
+                  color: isActive('/rewards/targets') ? theme.palette.primary.main : theme.palette.text.secondary,
                 }}
               >
                 <TrophyIcon fontSize="small" />
@@ -828,15 +836,11 @@ const Sidebar = ({ open, onClose }) => {
               primary="Rewards"
               sx={{
                 '& .MuiTypography-root': {
-                  fontWeight: rewardsOpen ? 'bold' : 'medium',
-                  color: rewardsOpen ? '#ff9800' : theme.palette.text.primary,
+                  fontWeight: isActive('/rewards/targets') ? 'bold' : 'medium',
+                  color: isActive('/rewards/targets') ? theme.palette.primary.main : theme.palette.text.primary,
                 }
               }}
             />
-            {rewardsOpen ?
-              <ExpandLess sx={{ color: '#ff9800' }} /> :
-              <ExpandMore />
-            }
           </ListItemButton>
         </ListItem>
         <Collapse in={rewardsOpen} timeout="auto" unmountOnExit>

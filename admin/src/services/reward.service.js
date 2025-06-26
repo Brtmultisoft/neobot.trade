@@ -315,6 +315,14 @@ const RewardService = {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  },
+
+  async getEligibleUsersForReward(rewardType) {
+    return this.getAllRewards({ status: 'qualified', reward_type: rewardType });
+  },
+
+  async getRewardedUsersForReward(rewardType) {
+    return this.getAllRewards({ status: 'approved,completed', reward_type: rewardType });
   }
 };
 

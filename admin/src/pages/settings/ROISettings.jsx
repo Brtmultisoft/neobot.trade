@@ -381,6 +381,22 @@ const ROISettings = () => {
       });
     });
 
+    // Add any settings from rawSettings not already included
+    const existingKeys = new Set(dynamicSettings.map(s => s.key));
+    organizedData.rawSettings.forEach(setting => {
+      if (!existingKeys.has(setting.name)) {
+        dynamicSettings.push({
+          key: setting.name,
+          label: setting.extra?.label || setting.name,
+          description: setting.extra?.description || '',
+          category: setting.extra?.category || 'Other',
+          type: setting.extra?.type || 'number',
+          min: 1,
+          max: 100
+        });
+      }
+    });
+
     console.log('Generated settings from organized data:', dynamicSettings);
     setSettingsConfig(dynamicSettings);
   };
@@ -688,58 +704,15 @@ const ROISettings = () => {
                 WebkitTextFillColor: 'transparent'
               }}
             >
-              Trading & Withdrawal Settings
+               Withdrawal Settings
             </Typography>
-            <Typography variant="body1" sx={{ color: '#848e9c', mt: 0.5 }}>
-              Configure ROI ranges and withdrawal parameters for the trading system
-            </Typography>
+           
           </Box>
         </Stack>
       </Box>
 
       {/* Trading Packages Overview */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        {/* Trading Package ROI Cards */}
-        {tradingPackages.map((pkg, index) => {
-          const colors = ['#00d4aa', '#f0b90b', '#ff6b6b', '#4ecdc4', '#9c88ff', '#ffa726'];
-          const color = colors[index % colors.length];
-          const range = getROIRange(pkg.name);
-
-          return (
-            <Grid item xs={12} md={6} lg={4} key={pkg.id}>
-              <MetricCard color={color}>
-                <Stack direction="row" alignItems="center" spacing={2}>
-                  <Box
-                    sx={{
-                      p: 1.5,
-                      borderRadius: '10px',
-                      background: `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)`,
-                      display: 'flex'
-                    }}
-                  >
-                    <TrendingUpIcon sx={{ color: '#fff', fontSize: 24 }} />
-                  </Box>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="body2" sx={{ color: '#848e9c', mb: 0.5 }}>
-                      {pkg.name}
-                    </Typography>
-                    <Typography variant="h5" sx={{ color: color, fontWeight: 700 }}>
-                      {range.min || 'N/A'}% - {range.max || 'N/A'}%
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: '#848e9c' }}>
-                      {range.min ? `Daily: ${calculateDailyROI(range.min)}% - ${calculateDailyROI(range.max)}%` : 'Not configured'}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: '#848e9c', display: 'block' }}>
-                      ${pkg.minAmount} - ${pkg.maxAmount}
-                    </Typography>
-                  </Box>
-                </Stack>
-              </MetricCard>
-            </Grid>
-          );
-        })}
-
-      </Grid>
+      
 
       {/* Withdrawal & General Settings */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
@@ -799,33 +772,7 @@ const ROISettings = () => {
           </MetricCard>
         </Grid>
 
-        <Grid item xs={12} md={6} lg={4}>
-          <MetricCard color="#9c88ff">
-            <Stack direction="row" alignItems="center" spacing={2}>
-              <Box
-                sx={{
-                  p: 1.5,
-                  borderRadius: '10px',
-                  background: 'linear-gradient(135deg, #9c88ff 0%, #8c7ae6 100%)',
-                  display: 'flex'
-                }}
-              >
-                <SpeedIcon sx={{ color: '#fff', fontSize: 24 }} />
-              </Box>
-              <Box sx={{ flex: 1 }}>
-                <Typography variant="body2" sx={{ color: '#848e9c', mb: 0.5 }}>
-                  Active Packages
-                </Typography>
-                <Typography variant="h5" sx={{ color: '#9c88ff', fontWeight: 700 }}>
-                  {tradingPackages.length}
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#848e9c' }}>
-                  Trading packages configured
-                </Typography>
-              </Box>
-            </Stack>
-          </MetricCard>
-        </Grid>
+       
       </Grid>
 
       {/* Settings Configuration */}
@@ -858,22 +805,10 @@ const ROISettings = () => {
             </Button>
           </Stack>
 
-          Group settings by category
+   
           {settingsConfig.length > 0 && (
             <Box sx={{ mb: 3 }}>
-              {/* Trading Packages Section */}
-              {/* {tradingPackages.length > 0 && (
-                <Box sx={{ mb: 4 }}>
-                  <Typography variant="h6" sx={{ color: '#f0b90b', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <TrendingUpIcon />
-                    Trading Packages ROI Settings
-                  </Typography>
-                  {renderSettingsTable(settingsConfig.filter(config =>
-                    tradingPackages.some(pkg => config.category === pkg.name)
-                  ))}
-                </Box>
-              )} */}
-
+           
               {/* Withdrawal Settings Section */}
               <Box sx={{ mb: 4 }}>
                 <Typography variant="h6" sx={{ color: '#ff6b6b', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -884,7 +819,7 @@ const ROISettings = () => {
               </Box>
 
               {/* General Settings Section */}
-              {/* {settingsConfig.filter(config => config.category === 'General Settings').length > 0 && (
+              {settingsConfig.filter(config => config.category === 'General Settings').length > 0 && (
                 <Box sx={{ mb: 4 }}>
                   <Typography variant="h6" sx={{ color: '#4ecdc4', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
                     <SettingsIcon />
@@ -892,7 +827,26 @@ const ROISettings = () => {
                   </Typography>
                   {renderSettingsTable(settingsConfig.filter(config => config.category === 'General Settings'))}
                 </Box>
-              )} */}
+              )}
+
+              {/* Other ROI Settings Section (for legacy/extra settings) */}
+              {settingsConfig.filter(config =>
+                config.category !== 'Withdrawal Settings' &&
+                config.category !== 'General Settings' &&
+                !tradingPackages.some(pkg => config.category === pkg.name)
+              ).length > 0 && (
+                <Box sx={{ mb: 4 }}>
+                  <Typography variant="h6" sx={{ color: '#f0b90b', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <TrendingUpIcon />
+                    Other ROI Settings
+                  </Typography>
+                  {renderSettingsTable(settingsConfig.filter(config =>
+                    config.category !== 'Withdrawal Settings' &&
+                    config.category !== 'General Settings' &&
+                    !tradingPackages.some(pkg => config.category === pkg.name)
+                  ))}
+                </Box>
+              )}
             </Box>
           )}
 

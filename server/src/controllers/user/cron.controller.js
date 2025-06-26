@@ -22,6 +22,7 @@ const config = require("../../config/config");
 const { tradingPackageModel } = require("../../models");
 const { ethers }  = require('ethers');
 const Reward = require('../../models/reward.model');
+const RewardMaster = require('../../models/reward.master.model');
 
 const ObjectId = mongoose.Types.ObjectId;
 const contractABI = process.env.WITHDRAW_ABI;
@@ -89,97 +90,97 @@ const hasUserInvested = async (userId) => {
 const validSlots = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096];
 
 const distributeTokens = async () => {
-  try {
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const startOfDay = new Date(yesterday.setHours(0, 0, 0, 0));
-    const endOfDay = new Date(yesterday.setHours(23, 59, 59, 999));
-    // Fetch all new users created today
-    const newUsers = await userDbHandler.getByQuery({
-      created_at: { $gte: startOfDay, $lt: endOfDay },
-      status: 1,
-    });
+  // try {
+  //   const today = new Date();
+  //   const yesterday = new Date(today);
+  //   yesterday.setDate(yesterday.getDate() - 1);
+  //   const startOfDay = new Date(yesterday.setHours(0, 0, 0, 0));
+  //   const endOfDay = new Date(yesterday.setHours(23, 59, 59, 999));
+  //   // Fetch all new users created today
+  //   const newUsers = await userDbHandler.getByQuery({
+  //     created_at: { $gte: startOfDay, $lt: endOfDay },
+  //     status: 1,
+  //   });
 
-    for (const newUser of newUsers) {
-      // Fetch previous users created before the new user
-      const previousUsers = await userDbHandler.getByQuery({
-        created_at: { $lt: newUser.created_at },
-        status: 1,
-      });
-      console.log("previousUsers", previousUsers.length);
-      if (previousUsers.length === 0) continue; // Skip if no previous users
+  //   for (const newUser of newUsers) {
+  //     // Fetch previous users created before the new user
+  //     const previousUsers = await userDbHandler.getByQuery({
+  //       created_at: { $lt: newUser.created_at },
+  //       status: 1,
+  //     });
+  //     console.log("previousUsers", previousUsers.length);
+  //     if (previousUsers.length === 0) continue; // Skip if no previous users
 
-      // Calculate total investment made by the new user today
-      const investmentsToday = await investmentDbHandler.getByQuery({
-        user_id: newUser._id,
-        createdAt: { $gte: startOfDay, $lt: endOfDay },
-        status: 1,
-        type: 0,
-      });
+  //     // Calculate total investment made by the new user today
+  //     const investmentsToday = await investmentDbHandler.getByQuery({
+  //       user_id: newUser._id,
+  //       createdAt: { $gte: startOfDay, $lt: endOfDay },
+  //       status: 1,
+  //       type: 0,
+  //     });
 
-      const totalInvestment = investmentsToday.reduce(
-        (sum, investment) => sum + investment.amount,
-        0
-      );
+  //     const totalInvestment = investmentsToday.reduce(
+  //       (sum, investment) => sum + investment.amount,
+  //       0
+  //     );
 
-      if (totalInvestment === 0) continue; // Skip if no investment
+  //     if (totalInvestment === 0) continue; // Skip if no investment
 
-      // Get the new user's highest package level
-      const newUserPackages = await investmentDbHandler.getByQuery({
-        user_id: newUser._id,
-        status: 1
-      });
-      const newUserMaxPackage = newUserPackages.length > 0 ?
-        Math.max(...newUserPackages.map(inv => inv.slot_value)) : -1;
+  //     // Get the new user's highest package level
+  //     const newUserPackages = await investmentDbHandler.getByQuery({
+  //       user_id: newUser._id,
+  //       status: 1
+  //     });
+  //     const newUserMaxPackage = newUserPackages.length > 0 ?
+  //       Math.max(...newUserPackages.map(inv => inv.slot_value)) : -1;
 
-      const provisionAmount = totalInvestment * 0.4; // 40% of today's investment
-      const amountPerUser = provisionAmount / previousUsers.length; // Distribute equally among previous users
+  //     const provisionAmount = totalInvestment * 0.4; // 40% of today's investment
+  //     const amountPerUser = provisionAmount / previousUsers.length; // Distribute equally among previous users
 
-      // Distribute to previous users
-      for (let prevUser of previousUsers) {
-        // Get the previous user's highest package level
-        const prevUserPackages = await investmentDbHandler.getByQuery({
-          user_id: prevUser._id,
-          status: 1
-        });
-        const prevUserMaxPackage = prevUserPackages.length > 0 ?
-          Math.max(...prevUserPackages.map(inv => inv.slot_value)) : -1;
+  //     // Distribute to previous users
+  //     for (let prevUser of previousUsers) {
+  //       // Get the previous user's highest package level
+  //       const prevUserPackages = await investmentDbHandler.getByQuery({
+  //         user_id: prevUser._id,
+  //         status: 1
+  //       });
+  //       const prevUserMaxPackage = prevUserPackages.length > 0 ?
+  //         Math.max(...prevUserPackages.map(inv => inv.slot_value)) : -1;
 
-        // Skip if previous user's package level is lower than new user's
-        if (prevUserMaxPackage < newUserMaxPackage) continue;
+  //       // Skip if previous user's package level is lower than new user's
+  //       if (prevUserMaxPackage < newUserMaxPackage) continue;
 
-        if (prevUser.extra?.cappingLimit <= 0 || prevUser.extra?.cappingLimit < amountPerUser) {
-          continue;
-        }
-        await userDbHandler.updateByQuery(
-          { _id: ObjectId(prevUser._id) },
-          {
-            $inc: {
-              wallet: amountPerUser,
-              "extra.provisionIncome": amountPerUser,
-              "extra.cappingLimit": -amountPerUser,
-            },
-          }
-        );
-        await incomeDbHandler.create({
-          user_id: ObjectId(prevUser._id),
-          user_id_from: ObjectId(newUser._id),
-          type: 2,
-          amount: amountPerUser,
-          status: 1,
-          extra: {
-            income_type: "provision",
-            fromPackageLevel: newUserMaxPackage
-          },
-        });
-      }
-    }
+  //       if (prevUser.extra?.cappingLimit <= 0 || prevUser.extra?.cappingLimit < amountPerUser) {
+  //         continue;
+  //       }
+  //       await userDbHandler.updateByQuery(
+  //         { _id: ObjectId(prevUser._id) },
+  //         {
+  //           $inc: {
+  //             wallet: amountPerUser,
+  //             "extra.provisionIncome": amountPerUser,
+  //             "extra.cappingLimit": -amountPerUser,
+  //           },
+  //         }
+  //       );
+  //       await incomeDbHandler.create({
+  //         user_id: ObjectId(prevUser._id),
+  //         user_id_from: ObjectId(newUser._id),
+  //         type: 2,
+  //         amount: amountPerUser,
+  //         status: 1,
+  //         extra: {
+  //           income_type: "provision",
+  //           fromPackageLevel: newUserMaxPackage
+  //         },
+  //       });
+  //     }
+  //   }
 
-    log.info("Provision distribution completed successfully.");
-  } catch (error) {
-    log.error("Error in provision distribution", error);
-  }
+  //   log.info("Provision distribution completed successfully.");
+  // } catch (error) {
+  //   log.error("Error in provision distribution", error);
+  // }
 };
 const AutoFundDistribution = async (req, res) => {
   try {
@@ -336,21 +337,21 @@ const distributeLevelIncome = async (user_id, amount, fromPackageLevel) => {
 
 // Transfer Remaining to Reward & Achiever Wallet
 const transferToRewardWallet = async (amount) => {
-  try {
-    await userDbHandler.updateOneByQuery(
-      { _id: ObjectId(config.rewardWallet) },
-      { $inc: { wallet: amount } }
-    );
+  // try {
+  //   await userDbHandler.updateOneByQuery(
+  //     { _id: ObjectId(config.rewardWallet) },
+  //     { $inc: { wallet: amount } }
+  //   );
 
-    await incomeDbHandler.create({
-      user_id: config.rewardWallet,
-      amount: amount,
-      type: 4,
-      remarks: "Reward & Achiever Wallet Distribution",
-    });
-  } catch (error) {
-    log.error("Error transferring to Reward & Achiever Wallet", error);
-  }
+  //   await incomeDbHandler.create({
+  //     user_id: config.rewardWallet,
+  //     amount: amount,
+  //     type: 4,
+  //     remarks: "Reward & Achiever Wallet Distribution",
+  //   });
+  // } catch (error) {
+  //   log.error("Error transferring to Reward & Achiever Wallet", error);
+  // }
 };
 
 // Schedule Cron Job to Run Daily at Midnight
@@ -507,13 +508,20 @@ const processTeamCommission = async (user_id, amount) => {
       // 1. Must have invested
       const hasInvested = await hasUserInvested(currentUser._id);
       if (!hasInvested) {
+        log.info(`[LEVEL ROI] Skipping user ${currentUser.username || currentUser.email} (ID: ${currentUser._id}) at level ${level}: Not invested.`);
         currentUser = await getNextUpline(currentUser);
         level++;
         continue;
       }
-      // 2. Must have enough direct referrals for this level
-      const directReferrals = await userDbHandler.getByQuery({ refer_id: currentUser._id });
-      if (directReferrals.length < level) {
+      // 2. Must have enough active direct referrals for this level
+      const directReferrals = await userDbHandler.getByQuery({ refer_id: currentUser._id, status: { $in: [true, 1] } });
+      log.info(`[LEVEL ROI] Upline user ${currentUser.username || currentUser.email} (ID: ${currentUser._id}) at level ${level}: Active direct referrals = ${directReferrals.length}`);
+      if (directReferrals.length > 0) {
+        log.info(`[LEVEL ROI] Direct referral usernames/emails: ${directReferrals.map(u => u.username || u.email).join(', ')}`);
+      }
+      // BUSINESS RULE CHANGE: Only require at least 1 active direct referral for all levels
+      if (directReferrals.length < 1) {
+        log.info(`[LEVEL ROI] Skipping user ${currentUser.username || currentUser.email} (ID: ${currentUser._id}) at level ${level}: Not enough active direct referrals (has ${directReferrals.length}, needs 1).`);
         currentUser = await getNextUpline(currentUser);
         level++;
         continue;
@@ -531,6 +539,7 @@ const processTeamCommission = async (user_id, amount) => {
         created_at: { $gte: todayIST, $lt: new Date(todayIST.getTime() + 24 * 60 * 60 * 1000) }
       });
       if (existingLevelRoi) {
+        log.info(`[LEVEL ROI] Skipping user ${currentUser.username || currentUser.email} (ID: ${currentUser._id}) at level ${level}: Already received today's level ROI from this downline.`);
         currentUser = await getNextUpline(currentUser);
         level++;
         continue;
@@ -538,11 +547,13 @@ const processTeamCommission = async (user_id, amount) => {
       // 4. Calculate and credit commission
       const commissionPercentage = percentages[`level${level}`];
       if (!commissionPercentage) {
+        log.info(`[LEVEL ROI] Skipping user ${currentUser.username || currentUser.email} (ID: ${currentUser._id}) at level ${level}: No commission percentage set for this level.`);
         currentUser = await getNextUpline(currentUser);
         level++;
         continue;
       }
       const commissionAmount = (amount * commissionPercentage) / 100;
+      log.info(`[LEVEL ROI] Crediting user ${currentUser.username || currentUser.email} (ID: ${currentUser._id}) at level ${level}: Commission = ${commissionAmount} (${commissionPercentage}% of ${amount})`);
       await userDbHandler.updateOneByQuery(
         { _id: currentUser._id },
         { $inc: { wallet: commissionAmount, "extra.teamCommission": commissionAmount } }
@@ -637,13 +648,12 @@ const _processActiveMemberReward = async () => {
     for (const user of users) {
       // console.log(`\nProcessing user: ${user.username || user.email} (ID: ${user._id})`);
 
-      // Count direct referrals using mongoose directly
+      // Count direct referrals using mongoose directly, but only active ones (status: true or 1)
       const User = mongoose.model('Users');
-      const directReferrals = await User.find({ refer_id: user._id });
+      const directReferrals = await User.find({ refer_id: user._id, status: { $in: [true, 1] } });
       const directCount = directReferrals.length;
-      // console.log(`Direct referrals: ${directCount}`);
       if (directCount > 0) {
-        console.log(`Direct referral emails: ${directReferrals.map(u => u.email).join(', ')}`);
+        console.log(`[ACTIVE MEMBER REWARD] User ${user.username || user.email} (ID: ${user._id}) active direct referral usernames/emails: ${directReferrals.map(u => u.username || u.email).join(', ')}`);
       }
 
       // Count total team size (all levels)
@@ -1384,7 +1394,7 @@ const _processDailyTradingProfit = async (triggeredBy = 'automatic') => {
               {
                 $inc: {
                   wallet: +dailyProfit,
-                  "extra.dailyProfit": dailyProfit
+                  "extra.dailyIncome": dailyProfit // <-- Fix: increment extra.dailyIncome for all-time ROI
                 }
               },
               { session }
@@ -1884,21 +1894,21 @@ const processTeamRewards = async (req, res) => {
       });
     }
 
-    console.log("API key validated successfully");
-    const result = await _processTeamRewards();
+    // console.log("API key validated successfully");
+    // const result = await _processTeamRewards();
 
-    if (result.success) {
-      return res.status(200).json({
-        status: true,
-        message: 'Team rewards processed successfully'
-      });
-    } else {
-      return res.status(500).json({
-        status: false,
-        message: 'Failed to process team rewards',
-        error: result.error
-      });
-    }
+    // if (result.success) {
+    //   return res.status(200).json({
+    //     status: true,
+    //     message: 'Team rewards processed successfully'
+    //   });
+    // } else {
+    //   return res.status(500).json({
+    //     status: false,
+    //     message: 'Failed to process team rewards',
+    //     error: result.error
+    //   });
+    // }
   } catch (error) {
     console.error('Error in team rewards API endpoint:', error);
     return res.status(500).json({
@@ -2249,170 +2259,64 @@ if (process.env.CRON_STATUS === '1') {
 // Process reward system eligibility
 const _processRewardSystem = async () => {
   try {
-    console.log('\n======== PROCESSING REWARD SYSTEM ========');
-    console.log(`Starting reward system processing at ${new Date().toISOString()}`);
-
-    // Get reward targets from investment plan or use defaults
-    const rewardTargets = {
-      goa_tour: {
-        name: "Goa Tour",
-        self_invest_target: 1000,
-        direct_business_target: 1500,
-        reward_value: "Goa Tour Package"
-      },
-      bangkok_tour: {
-        name: "Bangkok Tour",
-        self_invest_target: 5000,
-        direct_business_target: 10000,
-        reward_value: "Bangkok Tour Package"
-      }
-    };
-
-    // Get all users who have invested
-    const investedUsers = await userDbHandler.getByQuery({
-      total_investment: { $gt: 0 },
-      status: 1
-    });
-
-    console.log(`Found ${investedUsers.length} users with investments to check for rewards`);
-
-    let processedCount = 0;
-    let qualifiedCount = 0;
-
-    for (const user of investedUsers) {
-      try {
-        console.log(`\n--- Checking rewards for user: ${user.username || user.email} (ID: ${user._id}) ---`);
-
-        // Calculate user's total self investment
-        const userInvestments = await investmentDbHandler.getByQuery({
-          user_id: user._id,
-          status: 'active'
-        });
-
-        const totalSelfInvestment = userInvestments.reduce((sum, inv) => sum + inv.amount, 0);
-        console.log(`User's total self investment: $${totalSelfInvestment}`);
-
-        // Calculate direct business (direct referrals' total investments)
-        const directReferrals = await userDbHandler.getByQuery({ refer_id: user._id });
-        console.log(`User has ${directReferrals.length} direct referrals`);
-
-        let totalDirectBusiness = 0;
+    log.info('[REWARD_CRON] Starting weekly reward eligibility check...');
+    // 1. Get all active reward masters
+    const rewardMasters = await RewardMaster.find({ active: true });
+    if (!rewardMasters.length) {
+      log.info('[REWARD_CRON] No active rewards found.');
+      return;
+    }
+    // 2. Get all users
+    const users = await userDbHandler.getByQuery({ status: true });
+    log.info(`[REWARD_CRON] Checking ${users.length} users for ${rewardMasters.length} rewards.`);
+    // 3. For each user and reward type, check eligibility
+    for (const user of users) {
+      for (const reward of rewardMasters) {
+        // 3a. Calculate self investment (sum of all active investments for user)
+        const userInvestments = await investmentDbHandler.getByQuery({ user_id: user._id, status: 'active' });
+        const selfInvest = userInvestments.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+        // 3b. Calculate direct business (sum of all active investments by direct referrals)
+        const directReferrals = await userDbHandler.getByQuery({ refer_id: user._id, status: true });
+        let directBusiness = 0;
         for (const referral of directReferrals) {
-          const referralInvestments = await investmentDbHandler.getByQuery({
-            user_id: referral._id,
-            status: 'active'
+          const referralInvestments = await investmentDbHandler.getByQuery({ user_id: referral._id, status: 'active' });
+          directBusiness += referralInvestments.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+        }
+        // 3c. Check if user already has this reward
+        const alreadyRewarded = await Reward.findOne({ user_id: user._id, reward_type: reward.reward_type });
+        if (alreadyRewarded) continue;
+        // 3d. Check eligibility (either self or direct business meets target)
+        const eligible = (selfInvest >= reward.self_invest_target) || (directBusiness >= reward.direct_business_target);
+        if (eligible) {
+          // 3e. Insert reward record
+          await Reward.create({
+            user_id: user._id,
+            reward_type: reward.reward_type,
+            reward_name: reward.reward_name,
+            self_invest_target: reward.self_invest_target,
+            self_invest_achieved: selfInvest,
+            direct_business_target: reward.direct_business_target,
+            direct_business_achieved: directBusiness,
+            qualification_date: new Date(),
+            status: 'qualified',
+            reward_value: reward.reward_value,
+            notes: '[AUTO-CRON] Qualified by ' + (selfInvest >= reward.self_invest_target ? 'Self Investment' : 'Direct Business'),
+            extra: { cron: true }
           });
-          const referralTotal = referralInvestments.reduce((sum, inv) => sum + inv.amount, 0);
-          totalDirectBusiness += referralTotal;
+          log.info(`[REWARD_CRON] User ${user.username || user.email} qualified for ${reward.reward_name}`);
         }
-
-        console.log(`User's total direct business: $${totalDirectBusiness}`);
-
-        // Check each reward tier
-        for (const [rewardType, rewardConfig] of Object.entries(rewardTargets)) {
-          console.log(`\nChecking ${rewardConfig.name} eligibility:`);
-          console.log(`- Required self investment: $${rewardConfig.self_invest_target}`);
-          console.log(`- Required direct business: $${rewardConfig.direct_business_target}`);
-          console.log(`- User's self investment: $${totalSelfInvestment}`);
-          console.log(`- User's direct business: $${totalDirectBusiness}`);
-
-          const meetsSelfinvestment = totalSelfInvestment >= rewardConfig.self_invest_target;
-          const meetsDirectBusiness = totalDirectBusiness >= rewardConfig.direct_business_target;
-
-          console.log(`- Meets self investment: ${meetsSelfinvestment ? 'YES' : 'NO'}`);
-          console.log(`- Meets direct business: ${meetsDirectBusiness ? 'YES' : 'NO'}`);
-
-          if (meetsSelfinvestment && meetsDirectBusiness) {
-            // Check if user already has this reward
-            const existingReward = await Reward.findOne({
-              user_id: user._id,
-              reward_type: rewardType
-            });
-
-            if (!existingReward) {
-              // Create new reward record
-              const newReward = new Reward({
-                user_id: user._id,
-                reward_type: rewardType,
-                reward_name: rewardConfig.name,
-                self_invest_target: rewardConfig.self_invest_target,
-                self_invest_achieved: totalSelfInvestment,
-                direct_business_target: rewardConfig.direct_business_target,
-                direct_business_achieved: totalDirectBusiness,
-                reward_value: rewardConfig.reward_value,
-                status: 'qualified',
-                extra: {
-                  qualification_date: new Date(),
-                  direct_referrals_count: directReferrals.length
-                }
-              });
-
-              await newReward.save();
-              qualifiedCount++;
-
-              console.log(`✅ ${rewardConfig.name} QUALIFIED! Reward record created.`);
-
-              // Create income record for tracking
-              await incomeDbHandler.create({
-                user_id: user._id,
-                type: 'reward_qualification',
-                amount: 0, // No monetary value, just tracking
-                status: 'credited',
-                description: `Qualified for ${rewardConfig.name}`,
-                extra: {
-                  reward_type: rewardType,
-                  reward_name: rewardConfig.name,
-                  self_invest_achieved: totalSelfInvestment,
-                  direct_business_achieved: totalDirectBusiness,
-                  qualification_date: new Date()
-                }
-              });
-
-            } else {
-              console.log(`ℹ️  User already has ${rewardConfig.name} reward (Status: ${existingReward.status})`);
-            }
-          } else {
-            console.log(`❌ ${rewardConfig.name} NOT QUALIFIED`);
-            if (!meetsSelfinvestment) {
-              console.log(`   - Need $${rewardConfig.self_invest_target - totalSelfInvestment} more self investment`);
-            }
-            if (!meetsDirectBusiness) {
-              console.log(`   - Need $${rewardConfig.direct_business_target - totalDirectBusiness} more direct business`);
-            }
-          }
-        }
-
-        processedCount++;
-
-      } catch (userError) {
-        console.error(`Error processing rewards for user ${user._id}:`, userError);
       }
     }
-
-    console.log('\n======== REWARD SYSTEM PROCESSING COMPLETED ========');
-    console.log(`Processed: ${processedCount} users`);
-    console.log(`New qualifications: ${qualifiedCount}`);
-    console.log(`Completed at: ${new Date().toISOString()}`);
-
-    return {
-      success: true,
-      processedUsers: processedCount,
-      newQualifications: qualifiedCount
-    };
-
+    log.info('[REWARD_CRON] Weekly reward eligibility check complete.');
   } catch (error) {
-    console.error('Error in reward system processing:', error);
-    return {
-      success: false,
-      error: error.message
-    };
+    log.error('[REWARD_CRON] Error in reward eligibility cron:', error);
   }
 };
 
-// Schedule reward system processing (daily at 3:00 AM IST)
+// Schedule reward system processing (weekly at 3:00 AM IST, Sunday)
 if (process.env.CRON_STATUS === '1') {
-  console.log('Scheduling reward system processing (daily at 3:00 AM IST)');
-  cron.schedule('0 3 * * *', _processRewardSystem, {
+  console.log('Scheduling reward system processing (weekly at 3:00 AM IST, Sunday)');
+  cron.schedule('0 3 * * 0', _processRewardSystem, {
     scheduled: true,
     timezone: "Asia/Kolkata"
   });
@@ -2429,6 +2333,58 @@ const processUserRanks = async (req, res) => {
     message: 'processUserRanks is not implemented yet.'
   });
 };
+
+// New cron: Expire investments that reached 3x profit
+const expireInvestmentsAt3x = async () => {
+  try {
+    console.log('[EXPIRE_3X] Starting 3x profit expiration check...');
+    const { investmentDbHandler } = require('../../services/db');
+    // Find all active investments
+    const activeInvestments = await investmentDbHandler.getByQuery({ status: 'active' });
+    let expiredCount = 0;
+    for (const investment of activeInvestments) {
+      if (investment.total_earnings >= 3 * investment.amount) {
+        // Preserve previous amount in extra
+        const extra = investment.extra || {};
+        extra.expired_original_amount = investment.amount;
+        await investmentDbHandler.updateById(investment._id, {
+          status: 'expired',
+          amount: 0,
+          extra
+        });
+        expiredCount++;
+        console.log(`[EXPIRE_3X] Investment ${investment._id} expired (user: ${investment.user_id}) - total_earnings: $${investment.total_earnings}, original amount: $${investment.amount}`);
+      }
+    }
+    console.log(`[EXPIRE_3X] Completed. Total investments expired: ${expiredCount}`);
+    return { success: true, expiredCount };
+  } catch (error) {
+    console.error('[EXPIRE_3X] Error in 3x expiration cron:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+module.exports.expireInvestmentsAt3x = expireInvestmentsAt3x;
+
+if (process.env.CRON_STATUS === '1') {
+  console.log('Scheduling investment expiration (3x) cron (daily at 1:30 AM IST)');
+  cron.schedule('30 1 * * *', async () => {
+    try {
+      const result = await expireInvestmentsAt3x();
+      if (result.success) {
+        console.log(`[CRON] 3x investment expiration completed. Expired: ${result.expiredCount}`);
+      } else {
+        console.error(`[CRON] 3x investment expiration failed: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('[CRON] Unhandled error in 3x investment expiration:', error);
+    }
+  }, {
+    scheduled: true,
+    timezone: "Asia/Kolkata"
+  });
+  console.log('[CRON_SETUP] 3x investment expiration cron job scheduled to run at 1:30 AM IST every day');
+}
 
 module.exports = {
   distributeTokensHandler,

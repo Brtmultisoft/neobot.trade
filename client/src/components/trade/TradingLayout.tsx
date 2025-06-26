@@ -92,17 +92,18 @@ const TradingLayout: React.FC<TradingLayoutProps> = ({
         boxShadow: {
           xs: '0 2px 10px rgba(0, 0, 0, 0.15)',
           sm: '0 4px 20px rgba(0, 0, 0, 0.2)'
-        }
+        },
+        background: theme.palette.background.paper
       }}
     >
       {/* Header Section - Fully Responsive */}
       <Box
         sx={{
-          background: '#12151c',
+          background: theme.palette.background.default,
           padding: { xs: '12px', sm: '16px', md: '20px' },
           borderRadius: { xs: 0.5, sm: 1 },
           mb: { xs: 1.5, sm: 2, md: 3 },
-          border: '1px solid rgba(255, 255, 255, 0.05)',
+          border: `1px solid ${theme.palette.divider}`,
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -126,7 +127,8 @@ const TradingLayout: React.FC<TradingLayoutProps> = ({
             sx={{
               fontWeight: 500,
               m: 0,
-              fontSize: { xs: '1rem', sm: '1.1rem', md: '1.25rem' }
+              fontSize: { xs: '1rem', sm: '1.1rem', md: '1.25rem' },
+              color: theme.palette.text.primary
             }}
           >
             Live Trades
@@ -149,7 +151,8 @@ const TradingLayout: React.FC<TradingLayoutProps> = ({
               variant="subtitle1"
               sx={{
                 fontWeight: 600,
-                fontSize: { xs: '0.9rem', sm: '1rem' }
+                fontSize: { xs: '0.9rem', sm: '1rem' },
+                color: theme.palette.text.primary
               }}
             >
               {currentPair?.name}
@@ -189,7 +192,8 @@ const TradingLayout: React.FC<TradingLayoutProps> = ({
               background: 'rgba(0, 0, 0, 0.2)',
               transition: 'all 0.2s ease',
               textAlign: 'center',
-              minWidth: { xs: '100px', sm: 'auto' }
+              minWidth: { xs: '100px', sm: 'auto' },
+              color: theme.palette.text.primary
             }}
             className="price-updated"
           >
@@ -208,8 +212,8 @@ const TradingLayout: React.FC<TradingLayoutProps> = ({
                 ? 'rgba(14, 203, 129, 0.1)'
                 : 'rgba(246, 70, 93, 0.1)',
               color: priceDirection === 'up'
-                ? 'secondary.main'
-                : 'error.main',
+                ? theme.palette.secondary.main
+                : theme.palette.error.main,
               whiteSpace: 'nowrap'
             }}
           >
