@@ -949,14 +949,14 @@ const _processLevelRoiIncome = async (triggeredBy = 'automatic') => {
         }
         // Prevent duplicate processing
         const lastLevelRoiProcessedDate = user.last_level_roi_processed_date || user.extra?.last_level_roi_processed_date;
-        if (lastLevelRoiProcessedDate) {
-          const lastProcessedDate = new Date(lastLevelRoiProcessedDate);
-          lastProcessedDate.setHours(0, 0, 0, 0);
-          if (lastProcessedDate.getTime() === todayIST.getTime()) {
-            skippedCount++;
-            continue;
-          }
-        }
+        // if (lastLevelRoiProcessedDate) {
+        //   const lastProcessedDate = new Date(lastLevelRoiProcessedDate);
+        //   lastProcessedDate.setHours(0, 0, 0, 0);
+        //   if (lastProcessedDate.getTime() === todayIST.getTime()) {
+            // skippedCount++;
+        //     continue;
+        //   }
+        // }
         // Check if user has made an investment
         const hasInvested = await hasUserInvested(user._id);
         if (!hasInvested) {
