@@ -97,8 +97,10 @@ const ApiService = {
     retries = 2, // Number of retry attempts for transient errors
     retryDelay = 1000, // Delay between retries in milliseconds
   }) {
-    // Cancel any pending request with the same ID
-    this.cancelPendingRequest(requestId);
+    // PATCH: Do not cancel previous requests for /admin/get-investment-summary
+    if (endpoint !== '/admin/get-investment-summary') {
+      this.cancelPendingRequest(requestId);
+    }
 
     // Create a new AbortController
     const controller = new AbortController();

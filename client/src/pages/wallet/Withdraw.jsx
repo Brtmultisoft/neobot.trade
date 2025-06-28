@@ -115,11 +115,11 @@ const Withdraw = () => {
 
       // Show different message based on the staking release option
       if (withdrawalResponse.data?.stakingReleaseOption === 'partial') {
-        setSnackbarMessage('Withdrawal request submitted with 50% staking release! It will be processed after admin approval.');
+        setSnackbarMessage('Withdrawal request submitted with 50% staking release! It will be processed within 24 hrs.');
       } else if (withdrawalResponse.data?.stakingReleaseOption === 'full') {
-        setSnackbarMessage('Withdrawal request submitted with full staking release! It will be processed after admin approval.');
+        setSnackbarMessage('Withdrawal request submitted with full staking release! It will be processed within 24 hrs.');
       } else {
-        setSnackbarMessage('Withdrawal request submitted successfully! It will be processed after admin approval.');
+        setSnackbarMessage('Withdrawal request submitted successfully! It will be processed within 24 hrs.');
       }
 
       setSnackbarSeverity('success');
@@ -668,7 +668,7 @@ const Withdraw = () => {
               }
               label={
                 <Typography variant="body2">
-                  I understand that this withdrawal request will be processed after admin approval and may take 24-48 hours to complete.
+                  I understand that this withdrawal request will be processed within 24 hrs.
                 </Typography>
               }
             />

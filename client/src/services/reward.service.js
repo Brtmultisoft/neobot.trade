@@ -390,6 +390,16 @@ export const userRewardService = {
       console.warn('Active rewards API not available:', error);
       return { data: [] };
     }
+  },
+
+  // User: Apply for a reward
+  applyForReward: async (rewardId) => {
+    return api.post('/user/rewards/apply', { reward_id: rewardId }).then(res => res.data);
+  },
+
+  // User: Get all reward applications
+  getRewardApplications: async () => {
+    return api.get('/user/rewards/applications').then(res => res.data);
   }
 };
 
@@ -532,4 +542,19 @@ export default {
   user: safeUserRewardService,
   investment: investmentService,
   utils: rewardUtils
+};
+
+// Admin: Get all reward applications
+export const getAllRewardApplications = async () => {
+  return api.get('/admin/rewards/applications').then(res => res.data);
+};
+
+// Admin: Approve a reward application
+export const approveRewardApplication = async (applicationId) => {
+  return api.post(`/admin/rewards/applications/${applicationId}/approve`).then(res => res.data);
+};
+
+// Admin: Reject a reward application
+export const rejectRewardApplication = async (applicationId) => {
+  return api.post(`/admin/rewards/applications/${applicationId}/reject`).then(res => res.data);
 };

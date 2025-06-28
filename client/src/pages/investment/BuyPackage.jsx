@@ -639,38 +639,53 @@ const BuyPackage = () => {
                   <Paper
                     elevation={0}
                     sx={{
+                      background: plan.name?.toLowerCase().includes('gold')
+                        ? 'linear-gradient(135deg, #FFD700 0%, #FFEF8A 40%, #D4AF37 100%)'
+                        : plan.name?.toLowerCase().includes('silver')
+                        ? 'linear-gradient(135deg, #C0C0C0 0%, #F8F8FF 40%, #A8A9AD 100%)'
+                        : 'linear-gradient(135deg, #3375BB 0%, #2A5F9E 100%)',
+                      border: plan.name?.toLowerCase().includes('gold')
+                        ? '2px solid #FFD700'
+                        : plan.name?.toLowerCase().includes('silver')
+                        ? '2px solid #C0C0C0'
+                        : 'none',
+                      boxShadow: plan.name?.toLowerCase().includes('gold')
+                        ? '0 2px 8px rgba(212, 175, 55, 0.25)'
+                        : plan.name?.toLowerCase().includes('silver')
+                        ? '0 2px 8px rgba(192, 192, 192, 0.18)'
+                        : 'none',
                       p: 0,
                       borderRadius: 3,
-                      border: mode === 'dark'
-                        ? `1px solid rgba(255,255,255,0.1)`
-                        : `1px solid #E6E8EA`,
-                      backgroundColor: mode === 'dark'
-                        ? 'rgba(255,255,255,0.05)'
-                        : 'rgba(255, 255, 255, 1)',
-                      transition: 'all 0.3s ease',
-                      boxShadow: mode === 'dark'
-                        ? '0 4px 16px rgba(0, 0, 0, 0.2)'
-                        : '0 4px 16px rgba(0, 0, 0, 0.06)',
                       position: 'relative',
                       overflow: 'hidden',
                       cursor: 'pointer',
                       height: 'auto',
                       minHeight: '280px',
+                      transition: 'all 0.3s ease',
                       '&:hover': {
                         transform: 'translateY(-6px)',
-                        boxShadow: mode === 'dark'
-                          ? '0 12px 24px rgba(0,0,0,0.3)'
-                          : '0 12px 24px rgba(51, 117, 187, 0.15)',
-                        borderColor: plan.extra?.color ||
-                          (plan.name?.toLowerCase().includes('gold') ? '#FFD700' :
-                           plan.name?.toLowerCase().includes('silver') ? '#C0C0C0' :
-                           theme.palette.primary.main),
+                        boxShadow: plan.name?.toLowerCase().includes('gold')
+                          ? '0 12px 24px rgba(212, 175, 55, 0.35)'
+                          : plan.name?.toLowerCase().includes('silver')
+                          ? '0 12px 24px rgba(192, 192, 192, 0.25)'
+                          : mode === 'dark'
+                            ? '0 12px 24px rgba(0,0,0,0.3)'
+                            : '0 12px 24px rgba(51, 117, 187, 0.15)',
+                        borderColor: plan.name?.toLowerCase().includes('gold')
+                          ? '#FFD700'
+                          : plan.name?.toLowerCase().includes('silver')
+                          ? '#C0C0C0'
+                          : theme.palette.primary.main,
                         '& .package-icon': {
                           transform: 'scale(1.05)',
                         },
                         '& .package-button': {
                           transform: 'translateY(-1px)',
-                          boxShadow: '0 6px 16px rgba(51, 117, 187, 0.3)',
+                          boxShadow: plan.name?.toLowerCase().includes('gold')
+                            ? '0 6px 16px rgba(212, 175, 55, 0.3)'
+                            : plan.name?.toLowerCase().includes('silver')
+                            ? '0 6px 16px rgba(192, 192, 192, 0.22)'
+                            : '0 6px 16px rgba(51, 117, 187, 0.3)',
                         },
                       },
                       animation: `fade-slide-in 0.4s ease-out ${index * 0.1}s both`,
@@ -683,10 +698,10 @@ const BuyPackage = () => {
                     {/* Compact Header Section */}
                     <Box
                       sx={{
-                        background: plan.extra?.color === '#FFD700' || plan.name?.toLowerCase().includes('gold')
-                          ? 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)'
-                          : plan.extra?.color === '#C0C0C0' || plan.name?.toLowerCase().includes('silver')
-                          ? 'linear-gradient(135deg, #C0C0C0 0%, #A8A8A8 100%)'
+                        background: plan.name?.toLowerCase().includes('gold')
+                          ? 'linear-gradient(135deg, #FFD700 0%, #FFEF8A 40%, #D4AF37 100%)'
+                          : plan.name?.toLowerCase().includes('silver')
+                          ? 'linear-gradient(135deg, #C0C0C0 0%, #F8F8FF 40%, #A8A9AD 100%)'
                           : 'linear-gradient(135deg, #3375BB 0%, #2A5F9E 100%)',
                         p: 2.5,
                         borderRadius: '12px 12px 0 0',
@@ -709,8 +724,8 @@ const BuyPackage = () => {
                             variant="h6"
                             fontWeight="bold"
                             sx={{
-                              color: '#fff',
-                              textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                              color: plan.name?.toLowerCase().includes('gold') || plan.name?.toLowerCase().includes('silver') ? '#222' : '#fff',
+                              textShadow: plan.name?.toLowerCase().includes('gold') || plan.name?.toLowerCase().includes('silver') ? '0 1px 2px rgba(255,255,255,0.25)' : '0 1px 2px rgba(0,0,0,0.3)',
                               mb: 0.5,
                             }}
                           >
@@ -719,7 +734,7 @@ const BuyPackage = () => {
                           <Typography
                             variant="body2"
                             sx={{
-                              color: 'rgba(255, 255, 255, 0.9)',
+                              color: plan.name?.toLowerCase().includes('gold') || plan.name?.toLowerCase().includes('silver') ? '#222' : 'rgba(255, 255, 255, 0.9)',
                               fontSize: '0.85rem',
                             }}
                           >
@@ -745,8 +760,8 @@ const BuyPackage = () => {
                             variant="h5"
                             fontWeight="bold"
                             sx={{
-                              color: '#fff',
-                              textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                              color: plan.name?.toLowerCase().includes('gold') || plan.name?.toLowerCase().includes('silver') ? '#222' : '#fff',
+                              textShadow: plan.name?.toLowerCase().includes('gold') || plan.name?.toLowerCase().includes('silver') ? '0 1px 2px rgba(255,255,255,0.25)' : '0 1px 2px rgba(0,0,0,0.3)',
                               lineHeight: 1,
                               mb: 0.5,
                             }}
@@ -756,7 +771,7 @@ const BuyPackage = () => {
                           <Typography
                             variant="caption"
                             sx={{
-                              color: 'rgba(255, 255, 255, 0.9)',
+                              color: plan.name?.toLowerCase().includes('gold') || plan.name?.toLowerCase().includes('silver') ? '#222' : 'rgba(255, 255, 255, 0.9)',
                               fontWeight: 'medium',
                               fontSize: '0.7rem',
                               display: 'block',
@@ -810,10 +825,10 @@ const BuyPackage = () => {
                               textAlign: 'center',
                               border: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`,
                             }}>
-                              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', color: plan.name?.toLowerCase().includes('gold') || plan.name?.toLowerCase().includes('silver') ? '#222' : undefined }}>
                                 $100 →
                               </Typography>
-                              <Typography variant="body2" fontWeight="bold" sx={{ color: '#0ECB81', fontSize: '0.8rem' }}>
+                              <Typography variant="body2" fontWeight="bold" sx={{ color: plan.name?.toLowerCase().includes('gold') || plan.name?.toLowerCase().includes('silver') ? '#222' : '#0ECB81', fontSize: '0.8rem' }}>
                                 ${(100 * (plan.daily_trading_roi / 100)).toFixed(2)}/day
                               </Typography>
                             </Box>
@@ -826,10 +841,10 @@ const BuyPackage = () => {
                               textAlign: 'center',
                               border: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`,
                             }}>
-                              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', color: plan.name?.toLowerCase().includes('gold') || plan.name?.toLowerCase().includes('silver') ? '#222' : undefined }}>
                                 $1000 →
                               </Typography>
-                              <Typography variant="body2" fontWeight="bold" sx={{ color: '#0ECB81', fontSize: '0.8rem' }}>
+                              <Typography variant="body2" fontWeight="bold" sx={{ color: plan.name?.toLowerCase().includes('gold') || plan.name?.toLowerCase().includes('silver') ? '#222' : '#0ECB81', fontSize: '0.8rem' }}>
                                 ${(1000 * (plan.daily_trading_roi / 100)).toFixed(2)}/day
                               </Typography>
                             </Box>
@@ -871,23 +886,37 @@ const BuyPackage = () => {
                         fullWidth
                         onClick={() => handlePlanSelect(plan)}
                         sx={{
+                          background: plan.name?.toLowerCase().includes('gold')
+                            ? 'linear-gradient(135deg, #FFD700 0%, #FFEF8A 40%, #D4AF37 100%)'
+                            : plan.name?.toLowerCase().includes('silver')
+                            ? 'linear-gradient(135deg, #C0C0C0 0%, #F8F8FF 40%, #A8A9AD 100%)'
+                            : 'linear-gradient(135deg, #3375BB 0%, #2A5F9E 100%)',
+                          color: (plan.name?.toLowerCase().includes('gold') || plan.name?.toLowerCase().includes('silver')) ? '#222' : '#fff',
+                          textShadow: (plan.name?.toLowerCase().includes('gold') || plan.name?.toLowerCase().includes('silver')) ? '0 1px 2px rgba(255,255,255,0.25)' : '0 1px 2px rgba(0,0,0,0.3)',
+                          boxShadow: plan.name?.toLowerCase().includes('gold')
+                            ? '0 2px 8px rgba(212, 175, 55, 0.25)'
+                            : plan.name?.toLowerCase().includes('silver')
+                            ? '0 2px 8px rgba(192, 192, 192, 0.18)'
+                            : '0 4px 12px rgba(51, 117, 187, 0.2)',
                           py: 1.5,
                           borderRadius: 2,
                           fontWeight: 'bold',
                           fontSize: '1rem',
-                          background: plan.extra?.color === '#FFD700' || plan.name?.toLowerCase().includes('gold')
-                            ? 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)'
-                            : plan.extra?.color === '#C0C0C0' || plan.name?.toLowerCase().includes('silver')
-                            ? 'linear-gradient(135deg, #C0C0C0 0%, #A8A8A8 100%)'
-                            : 'linear-gradient(135deg, #3375BB 0%, #2A5F9E 100%)',
-                          color: (plan.extra?.color === '#FFD700' || plan.name?.toLowerCase().includes('gold') ||
-                                  plan.extra?.color === '#C0C0C0' || plan.name?.toLowerCase().includes('silver')) ? '#000' : '#fff',
-                          boxShadow: '0 4px 12px rgba(51, 117, 187, 0.2)',
+                          border: plan.name?.toLowerCase().includes('gold')
+                            ? '1.5px solid #FFD700'
+                            : plan.name?.toLowerCase().includes('silver')
+                            ? '1.5px solid #C0C0C0'
+                            : 'none',
+                          backgroundImage: 'none',
                           transition: 'all 0.3s ease',
                           textTransform: 'none',
                           '&:hover': {
                             transform: 'translateY(-2px)',
-                            boxShadow: '0 6px 16px rgba(51, 117, 187, 0.3)',
+                            boxShadow: plan.name?.toLowerCase().includes('gold')
+                              ? '0 15px 30px rgba(212, 175, 55, 0.4)'
+                              : plan.name?.toLowerCase().includes('silver')
+                              ? '0 15px 30px rgba(192, 192, 192, 0.28)'
+                              : '0 15px 30px rgba(51, 117, 187, 0.4)',
                           },
                         }}
                       >

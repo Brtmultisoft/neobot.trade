@@ -665,6 +665,88 @@ module.exports = {
             responseData.msg = 'Failed to toggle 2FA status';
             return responseHelper.error(res, responseData);
         }
-    }
+    },
+
+    /**
+     * Get investment summary for all users
+     * Returns: [{ _id, username, email, self_investment, direct_business }]
+     */
+    getInvestmentSummary: async (req, res) => {
+        const responseData = {};
+        try {
+            const User = require('../../models/user.model');
+            const Investment = require('../../models/investment.model');
+            const RewardMaster = require('../../models/reward.master.model');
+
+            // Get all users
+            const users = await User.find({}, '_id username email');
+
+            // Get all investments in one go
+            const allInvestments = await Investment.find({}, 'user_id amount');
+
+            // Build a map of userId => total self investment
+            const selfInvestMap = {};
+            allInvestments.forEach(inv => {
+                const uid = inv.user_id.toString();
+                selfInvestMap[uid] = (selfInvestMap[uid] || 0) + (inv.amount || 0);
+            });
+
+            // Build a map of sponsorId => [referral userIds]
+            const userIdToSponsor = {};
+            const sponsorToReferrals = {};
+            const allUsers = await User.find({}, '_id refer_id');
+            allUsers.forEach(u => {
+                userIdToSponsor[u._id.toString()] = u.refer_id ? u.refer_id.toString() : null;
+                if (u.refer_id) {
+                    const sid = u.refer_id.toString();
+                    if (!sponsorToReferrals[sid]) sponsorToReferrals[sid] = [];
+                    sponsorToReferrals[sid].push(u._id.toString());
+                }
+            });
+
+            // Fetch all reward masters
+            const rewardMasters = await RewardMaster.find({ active: true });
+
+            // For each user, sum investments of their direct referrals and calculate eligible rewards
+            const data = users.map(user => {
+                const uid = user._id.toString();
+                // Self investment
+                const self_investment = selfInvestMap[uid] || 0;
+                // Direct business: sum of investments by direct referrals
+                let direct_business = 0;
+                const referrals = sponsorToReferrals[uid] || [];
+                referrals.forEach(refId => {
+                    direct_business += selfInvestMap[refId] || 0;
+                });
+                // Calculate eligible rewards
+                const eligibleRewards = rewardMasters
+                  .filter(rm =>
+                    (self_investment >= rm.self_invest_target) ||
+                    (direct_business >= rm.direct_business_target)
+                  )
+                  .map(rm => ({
+                    reward_id: rm._id,
+                    reward_name: rm.reward_name,
+                    reward_value: rm.reward_value
+                  }));
+                return {
+                    _id: user._id,
+                    username: user.username,
+                    email: user.email,
+                    self_investment,
+                    direct_business,
+                    eligibleRewards
+                };
+            });
+
+            responseData.msg = 'Investment summary fetched successfully!';
+            responseData.data = data;
+            return responseHelper.success(res, responseData);
+        } catch (error) {
+            log.error('Failed to fetch investment summary:', error);
+            responseData.msg = 'Failed to fetch investment summary';
+            return responseHelper.error(res, responseData);
+        }
+    },
 
 };

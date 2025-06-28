@@ -51,6 +51,7 @@ import RewardDebug from './pages/reward/RewardDebug';
 import RewardMasterList from './pages/reward/RewardMasterList';
 import RewardEligibleUsers from './pages/reward/RewardEligibleUsers';
 import RewardAllData from './pages/reward/RewardAllData';
+import RewardApplications from './pages/reward/RewardApplications';
 
 // Settings Pages
 import AdminSettings from './pages/settings/AdminSettings';
@@ -173,6 +174,7 @@ function App() {
             <Route path="/reward-master-list" element={<RewardMasterList />} />
             <Route path="/reward-eligible-users" element={<RewardEligibleUsers />} />
             <Route path="/reward-all-data" element={<RewardAllData />} />
+            <Route path="/reward-applications" element={<RewardApplications />} />
 
             {/* Settings Routes */}
             <Route path="/settings" element={<AdminSettings />} />

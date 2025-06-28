@@ -1717,7 +1717,7 @@ const Sidebar = ({ open, onClose }) => {
               </ListItemIcon>
               {!miniVariant && <ListItemText primary="Eligible Users" />}
             </ListItemButton>
-            <ListItemButton
+            {/* <ListItemButton
               component={Link}
               to="/reward-all-data"
               selected={isActive('/reward-all-data')}
@@ -1728,6 +1728,18 @@ const Sidebar = ({ open, onClose }) => {
                 <MonetizationOnIcon color={isActive('/reward-all-data') ? 'primary' : 'inherit'} fontSize="small" />
               </ListItemIcon>
               {!miniVariant && <ListItemText primary="All Rewards Data" />}
+            </ListItemButton> */}
+            <ListItemButton
+              component={Link}
+              to="/reward-applications"
+              selected={isActive('/reward-applications')}
+              onClick={() => handleItemClick('reward-applications')}
+              sx={{ pl: 4, borderRadius: 2, mb: 0.5 }}
+            >
+              <ListItemIcon sx={{ minWidth: 36 }}>
+                <VisibilityIcon color={isActive('/reward-applications') ? 'primary' : 'inherit'} fontSize="small" />
+              </ListItemIcon>
+              {!miniVariant && <ListItemText primary="Reward Applications" />}
             </ListItemButton>
           </List>
         </Collapse>

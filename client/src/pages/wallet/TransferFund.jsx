@@ -229,11 +229,13 @@ const TransferFund = () => {
               label="Self Transfer"
               iconPosition="start"
             />
+            {/*
             <Tab
               icon={<PersonIcon />}
               label="P2P"
               iconPosition="start"
             />
+            */}
           </Tabs>
 
           {/* Tab Panels */}
@@ -246,6 +248,7 @@ const TransferFund = () => {
                 loading={selfTransferLoading}
               />
             )}
+            {/*
             {activeTab === 1 && (
               <UserTransferForm
                 balance={topupBalance}
@@ -256,6 +259,7 @@ const TransferFund = () => {
                 onSearchUser={searchUsers}
               />
             )}
+            */}
           </Box>
         </CardContent>
       </Card>

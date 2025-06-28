@@ -180,19 +180,25 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
     return (typeof propUserROIRate === 'number' && !isNaN(propUserROIRate)) ? propUserROIRate : 0;
   }, [propUserROIRate]);
 
-  // Helper: Get ms until next midnight
-  const getMsUntilMidnight = () => {
+  // Helper: Get ms until 11:59 PM today
+  const getMsUntilEndOfDay = () => {
     const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setHours(24, 0, 0, 0);
-    return tomorrow.getTime() - now.getTime();
+    const endOfDay = new Date(now);
+    endOfDay.setHours(23, 59, 0, 0); // 11:59 PM
+    return endOfDay.getTime() - now.getTime();
   };
 
   // Helper: Get ms since activation or since midnight if already activated
   const getMsSinceStart = () => {
     if (tradingActive && lastActivationTime) {
       // If just activated, start from activation time
-      return Date.now() - new Date(lastActivationTime).setSeconds(0, 0);
+      const activation = new Date(lastActivationTime);
+      const now = new Date();
+      // If activated after 11:59 PM, treat as full progress
+      const endOfDay = new Date(now);
+      endOfDay.setHours(23, 59, 0, 0);
+      if (activation > endOfDay) return getMsUntilEndOfDay();
+      return Math.max(0, now.getTime() - activation.getTime());
     } else {
       // If already activated, start from midnight
       const now = new Date();
@@ -200,12 +206,41 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
     }
   };
 
-  // Calculate current profit based on time elapsed since start
+  // Helper: Get ms between activation and 11:59 PM
+  const getMsTotalPeriod = () => {
+    if (tradingActive && lastActivationTime) {
+      const activation = new Date(lastActivationTime);
+      const endOfDay = new Date(activation);
+      endOfDay.setHours(23, 59, 0, 0);
+      // If activated after 11:59 PM, treat as 1ms to avoid division by zero
+      return Math.max(1, endOfDay.getTime() - activation.getTime());
+    } else {
+      // If already activated, total period is from midnight to 11:59 PM
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date();
+      endOfDay.setHours(23, 59, 0, 0);
+      return endOfDay.getTime() - startOfDay.getTime();
+    }
+  };
+
+  // Calculate current profit based on time elapsed since activation until 11:59 PM
   const calculateCurrentProfit = useCallback(() => {
     if (!dailyProfitAmount) return 0;
-    const msSinceStart = getMsSinceStart();
-    const dayPortion = Math.min(msSinceStart / 86400000, 1); // 86400000 ms in a day
-    return dailyProfitAmount * dayPortion;
+    if (tradingActive && lastActivationTime) {
+      const msSinceStart = getMsSinceStart();
+      const msTotal = getMsTotalPeriod();
+      // If activated after 11:59 PM, full profit
+      if (msSinceStart >= msTotal) return dailyProfitAmount;
+      const dayPortion = Math.min(msSinceStart / msTotal, 1);
+      return dailyProfitAmount * dayPortion;
+    } else {
+      // If already activated, use full day
+      const msSinceStart = getMsSinceStart();
+      const msTotal = getMsTotalPeriod();
+      const dayPortion = Math.min(msSinceStart / msTotal, 1);
+      return dailyProfitAmount * dayPortion;
+    }
   }, [dailyProfitAmount, tradingActive, lastActivationTime]);
 
   // Update current profit and progress every second, reset at midnight
@@ -221,7 +256,7 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
       const midnightTimeout = setTimeout(() => {
         setCurrentProfit(0);
         setTimeElapsed('');
-      }, getMsUntilMidnight());
+      }, getMsUntilEndOfDay());
 
       return () => {
         clearInterval(interval);
@@ -236,8 +271,17 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
   // Progress percent for the progress bar
   const progressPercent = useMemo(() => {
     if (!dailyProfitAmount) return 0;
-    return Math.min((currentProfit / dailyProfitAmount) * 100, 100);
-  }, [currentProfit, dailyProfitAmount]);
+    if (tradingActive && lastActivationTime) {
+      const msSinceStart = getMsSinceStart();
+      const msTotal = getMsTotalPeriod();
+      if (msSinceStart >= msTotal) return 100;
+      return Math.min((msSinceStart / msTotal) * 100, 100);
+    } else {
+      const msSinceStart = getMsSinceStart();
+      const msTotal = getMsTotalPeriod();
+      return Math.min((msSinceStart / msTotal) * 100, 100);
+    }
+  }, [currentProfit, dailyProfitAmount, tradingActive, lastActivationTime]);
 
   // Helper function to show snackbar messages
   const showSnackbar = useCallback((message: string, severity: 'success' | 'error' | 'warning' | 'info') => {
@@ -479,73 +523,6 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
   useEffect(() => {
     fetchUserProfile();
   }, [fetchUserProfile]);
-
-  // Handle trading activation - optimized with useCallback
-  const startTrading = useCallback(async () => {
-    // If already active, do nothing
-    if (tradingActive || alreadyActivated) {
-      showSnackbar('Trading is already active for today.', 'info');
-      return;
-    }
-
-    // Check if user has invested
-    if (!hasInvestment) {
-      showSnackbar('You need to make an investment before you can start trading.', 'error');
-      return;
-    }
-
-    try {
-      setActivatingProfit(true);
-
-      // Call the API to activate daily trading using our new hook
-      const success = await activateDailyTrading();
-
-      if (success) {
-        // Store activation state in localStorage
-        if (userData && userData._id) {
-          localStorage.setItem(`dailyProfitActivated_${userData._id}`, 'true');
-          localStorage.setItem(`activationDate_${userData._id}`, new Date().toDateString());
-        }
-
-        // Set trading active
-        onActivate();
-        setAlreadyActivated(true);
-
-        // Show activation success animation
-        setShowActivationSuccess(true);
-        setTimeout(() => setShowActivationSuccess(false), 5000);
-
-        // Show success message
-        showSnackbar('Trading successfully activated! You will receive ROI and level ROI income for today.', 'success');
-
-        // Refresh user profile to get updated activation status - force refresh to bypass cache
-        await getUserProfile(true);
-      } else {
-        throw new Error('Failed to activate daily trading');
-      }
-    } catch (error: any) {
-      console.error('Activation error:', error);
-
-      // Check if user is blocked
-      if (error.isBlocked) {
-        showSnackbar(`Your account has been blocked. Reason: ${error.block_reason || 'No reason provided'}`, 'error');
-      }
-      // Check if error message indicates already activated
-      else if (error.message && error.message.includes('already activated')) {
-        showSnackbar('Daily profit already activated for today. Trading session started.', 'info');
-        setAlreadyActivated(true);
-        onActivate();
-
-        // Refresh user profile to get updated activation status - force refresh to bypass cache
-        await getUserProfile(true);
-      } else {
-        // Show error message
-        showSnackbar(error.message || 'There was an issue activating daily profit. Please try again.', 'error');
-      }
-    } finally {
-      setActivatingProfit(false);
-    }
-  }, [tradingActive, alreadyActivated, hasInvestment, userData, onActivate, showSnackbar, activateDailyTrading, getUserProfile]);
 
   // Timer reference to clear on unmount
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -1112,78 +1089,7 @@ const TradingActivation: React.FC<TradingActivationProps> = ({
         </Box>
 
         {/* Activation Button */}
-        <Box sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          mt: 4,
-          width: '100%'
-        }}>
-          <Button
-        variant="contained"
-        disabled={tradingActive || activatingProfit || !hasInvestment || isLoading || alreadyActivated}
-        onClick={startTrading}
-        sx={{
-          position: 'relative',
-          width: { xs: '100%', sm: '80%', md: '300px' },
-          height: { xs: '50px', md: '60px' },
-          background: (tradingActive || alreadyActivated)
-            ? 'linear-gradient(45deg, #0ecb81, #0bb974)'
-            : 'linear-gradient(45deg, #f6465d, #ff0033)',
-          borderRadius: '30px',
-          color: '#fff',
-          fontWeight: 600,
-          fontSize: { xs: '14px', md: '16px' },
-          textTransform: 'uppercase',
-          letterSpacing: '1px',
-          transition: 'all 0.3s ease',
-          boxShadow: (tradingActive || alreadyActivated)
-            ? '0 0 20px rgba(14, 203, 129, 0.5)'
-            : '0 8px 25px rgba(246, 70, 93, 0.5), 0 0 15px rgba(246, 70, 93, 0.3) inset',
-          '&:hover': {
-            background: (tradingActive || alreadyActivated)
-              ? 'linear-gradient(45deg, #0ecb81, #0bb974)'
-              : 'linear-gradient(45deg, #f6465d, #ff0033)',
-            transform: 'translateY(-2px)',
-            boxShadow: (tradingActive || alreadyActivated)
-              ? '0 0 30px rgba(14, 203, 129, 0.7)'
-              : '0 0 30px rgba(246, 70, 93, 0.7)',
-          },
-          cursor: (tradingActive || !hasInvestment || activatingProfit || isLoading || alreadyActivated) ? 'not-allowed' : 'pointer',
-        }}
-      >
-        <Box
-          sx={{
-            position: 'absolute',
-            top: -5,
-            left: -5,
-            right: -5,
-            bottom: -5,
-            borderRadius: '30px',
-            background: (tradingActive || alreadyActivated)
-              ? 'rgba(14, 203, 129, 0.5)'
-              : 'rgba(246, 70, 93, 0.5)',
-            opacity: 0,
-            zIndex: -1,
-            animation: `${pulseAnimation} 3s infinite`
-          }}
-        />
-        {isLoading ? (
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <CircularProgress size={20} sx={{ color: 'white', mr: 1 }} />
-            LOADING...
-          </Box>
-        ) : activatingProfit ? (
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <CircularProgress size={20} sx={{ color: 'white', mr: 1 }} />
-            ACTIVATING...
-          </Box>
-        ) : (tradingActive || alreadyActivated) ? (
-          'TRADING ACTIVE'
-        ) : (
-          'ACTIVATE TRADING'
-        )}
-      </Button>
-        </Box>
+        {/* Removed: Activation Button and related logic for auto-activation only */}
       </Box>
 
       {/* Snackbar for notifications */}

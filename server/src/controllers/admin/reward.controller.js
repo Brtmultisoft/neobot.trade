@@ -3,6 +3,8 @@
 const Reward = require('../../models/reward.model');
 const { userDbHandler, investmentDbHandler, incomeDbHandler } = require('../../services/db');
 const mongoose = require('mongoose');
+const RewardMaster = require('../../models/reward.master.model');
+const User = require('../../models/user.model');
 
 // Get all rewards with pagination and filters
 const getAllRewards = async (req, res) => {
@@ -57,7 +59,7 @@ const getAllRewards = async (req, res) => {
       rewards = await Reward.find(filter)
         .populate({
           path: 'user_id',
-          select: 'username email total_investment',
+          select: 'username name email phone_number total_investment',
           options: { strictPopulate: false }
         })
         .populate({
@@ -67,35 +69,80 @@ const getAllRewards = async (req, res) => {
         })
         .sort({ qualification_date: -1 })
         .skip(skip)
-        .limit(parseInt(limit));
+        .limit(parseInt(limit))
+        .lean();
     } catch (populateError) {
       console.log('Population failed, fetching rewards without user details:', populateError.message);
       // If population fails, get rewards without user details
       rewards = await Reward.find(filter)
         .sort({ qualification_date: -1 })
         .skip(skip)
-        .limit(parseInt(limit));
+        .limit(parseInt(limit))
+        .lean();
     }
 
-    console.log('Rewards fetched:', rewards.length);
+    // Fetch all needed users if any user_id is not populated
+    const userIdsToFetch = rewards.filter(r => typeof r.user_id === 'string').map(r => r.user_id);
+    let userMap = {};
+    if (userIdsToFetch.length > 0) {
+      const users = await User.find({ _id: { $in: userIdsToFetch } }, 'username name email phone_number total_investment').lean();
+      users.forEach(u => { userMap[u._id.toString()] = u; });
+    }
 
-    // Process rewards to handle missing user data
-    const processedRewards = (rewards || []).map(reward => {
-      const rewardObj = reward.toObject();
+    // Fetch all reward masters and build a map
+    const rewardMasters = await RewardMaster.find({}).lean();
+    const rewardMasterMap = {};
+    rewardMasters.forEach(rm => { rewardMasterMap[rm.reward_type] = rm; });
 
-      // If user_id is null, undefined, or just an ObjectId string, create a placeholder
-      if (!rewardObj.user_id || typeof rewardObj.user_id === 'string') {
-        const userId = typeof rewardObj.user_id === 'string' ? rewardObj.user_id : 'unknown';
-        rewardObj.user_id = {
-          _id: userId,
-          username: `User ${userId.slice(-4)}`,
-          email: `user${userId.slice(-4)}@example.com`,
+    // Process rewards to attach user and reward master data
+    const processedRewards = await Promise.all((rewards || []).map(async reward => {
+      // Always fetch user from DB for full details
+      let userObj = null;
+      try {
+        userObj = await User.findById(reward.user_id).lean();
+      } catch (e) {}
+      if (!userObj) {
+        userObj = {
+          _id: reward.user_id,
+          username: '-',
+          email: '-',
+          phone_number: '-',
+          name: '-',
           total_investment: 0
         };
       }
-
-      return rewardObj;
-    });
+      // Calculate self investment
+      let totalSelfInvested = 0;
+      let totalDirectBusiness = 0;
+      let directReferralsCount = 0;
+      try {
+        const userInvestments = await investmentDbHandler.getByQuery({ user_id: userObj._id, status: 'active' });
+        totalSelfInvested = userInvestments.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+        const directReferrals = await userDbHandler.getByQuery({ refer_id: userObj._id });
+        directReferralsCount = directReferrals.length;
+        for (const referral of directReferrals) {
+          const referralInvestments = await investmentDbHandler.getByQuery({ user_id: referral._id, status: 'active' });
+          totalDirectBusiness += referralInvestments.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+        }
+      } catch (e) {}
+      // Attach reward master
+      const rewardMaster = rewardMasterMap[reward.reward_type] || null;
+      return {
+        ...reward,
+        user: {
+          _id: userObj._id,
+          username: userObj.username || '-',
+          email: userObj.email || '-',
+          phone_number: userObj.phone_number || '-',
+          name: userObj.name || '-',
+          total_investment: userObj.total_investment || 0,
+          total_self_invested: totalSelfInvested,
+          total_direct_business: totalDirectBusiness,
+          direct_referrals_count: directReferralsCount
+        },
+        reward_master: rewardMaster
+      };
+    }));
 
     // Calculate statistics only if there are rewards
     let stats = [];
@@ -331,6 +378,50 @@ const processReward = async (req, res) => {
   }
 };
 
+// Reject reward
+const rejectReward = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+    const adminId = req.user?.id || req.body.admin_id;
+
+    const reward = await Reward.findById(id);
+    if (!reward) {
+      return res.status(404).json({
+        success: false,
+        message: 'Reward not found'
+      });
+    }
+
+    if (reward.status !== 'qualified') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only qualified rewards can be rejected'
+      });
+    }
+
+    // Update reward status
+    reward.status = 'rejected';
+    reward.processed_by = adminId;
+    reward.processed_at = new Date();
+    reward.notes = notes || '';
+    await reward.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Reward rejected successfully',
+      data: reward
+    });
+  } catch (error) {
+    console.error('Error rejecting reward:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error rejecting reward',
+      error: error.message
+    });
+  }
+};
+
 // Get reward statistics
 const getRewardStatistics = async (req, res) => {
   try {
@@ -441,6 +532,7 @@ module.exports = {
   getRewardById,
   approveReward,
   processReward,
+  rejectReward,
   getRewardStatistics,
   triggerRewardProcessing
 };

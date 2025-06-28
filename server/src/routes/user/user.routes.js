@@ -628,6 +628,11 @@ module.exports = () => {
         }
     });
 
+    // Reward application route
+    const rewardController = require('../../controllers/user/reward.controller');
+    Router.post('/user/rewards/apply', rewardController.applyForReward);
+    Router.get('/user/rewards/applications', rewardController.getUserRewardApplications);
+
     /**************************
      * END OF AUTHORIZED ROUTES
      **************************/

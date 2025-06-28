@@ -26,19 +26,21 @@ import {
   People as PeopleIcon
 } from '@mui/icons-material';
 import { safeUserRewardService, rewardUtils } from '../../services/reward.service';
-import RewardService from '../../services/reward.service';
 
 const RewardTargets = () => {
   const [userProgress, setUserProgress] = useState(null);
   const [loading, setLoading] = useState(true);
   const [rewardMasters, setRewardMasters] = useState([]);
+  const [appliedRewards, setAppliedRewards] = useState({});
 
   useEffect(() => {
     fetchUserProgress();
     fetchRewardMasters();
+    fetchAppliedRewards();
     const interval = setInterval(() => {
       fetchUserProgress();
       fetchRewardMasters();
+      fetchAppliedRewards();
     }, 30000); // 30 seconds
     return () => clearInterval(interval);
   }, []);
@@ -84,6 +86,34 @@ const RewardTargets = () => {
     }
   };
 
+  const fetchAppliedRewards = async () => {
+    try {
+      const res = await safeUserRewardService.getRewardApplications();
+      const map = {};
+      if (Array.isArray(res)) {
+        res.forEach(app => {
+          const type = (app.reward_type && app.reward_type.trim() !== '')
+            ? app.reward_type
+            : (app.reward_name ? app.reward_name.toLowerCase().replace(/ /g, '_') : '');
+          map[type] = app.status;
+        });
+      }
+      setAppliedRewards(map);
+    } catch (err) {
+      setAppliedRewards({});
+    }
+  };
+
+  const handleApplyReward = async (rewardId) => {
+    try {
+      await safeUserRewardService.applyForReward(rewardId);
+      fetchAppliedRewards();
+    } catch (err) {
+      // Optionally show error to user
+      console.log(err);
+    }
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300 }}>
@@ -91,6 +121,16 @@ const RewardTargets = () => {
       </Box>
     );
   }
+
+  // Debug: Show appliedRewards object
+  console.log('appliedRewards:', appliedRewards);
+
+  // Helper to normalize reward_type
+  const getRewardType = (reward) => {
+    return (reward.reward_type && reward.reward_type.trim() !== '')
+      ? reward.reward_type
+      : reward.reward_name.toLowerCase().replace(/ /g, '_');
+  };
 
   return (
     <Box sx={{ width: '100%' }}>
@@ -175,69 +215,97 @@ const RewardTargets = () => {
 
       {/* Reward Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        {rewardMasters.filter(r => r.active).map((reward) => (
-          <Grid item xs={12} lg={6} key={reward._id}>
-            <Card sx={{ border: '2px solid orange', height: '100%' }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <GiftIcon sx={{ color: 'orange', fontSize: 32 }} />
-                    <Box>
-                      <Typography variant="h5" fontWeight="bold">{reward.reward_name}</Typography>
-                      {reward.reward_type && (
-                        <Chip label={reward.reward_type} size="small" sx={{ mt: 0.5, ml: 0.5, fontSize: 12, background: '#f5f5f5' }} />
-                      )}
+        {rewardMasters.filter(r => r.active).map((reward) => {
+          // Calculate progress for this reward
+          const selfFulfilled = (userProgress?.current_self_investment || 0) >= reward.self_invest_target;
+          const directFulfilled = (userProgress?.current_direct_business || 0) >= reward.direct_business_target;
+          const qualified = selfFulfilled || directFulfilled;
+          const appliedStatus = appliedRewards[getRewardType(reward)];
+          // Debug: Log reward_type and appliedStatus for each card
+          console.log('CARD:', reward.reward_name, '| reward_type:', getRewardType(reward), '| appliedStatus:', appliedStatus);
+          return (
+            <Grid item xs={12} lg={6} key={reward._id}>
+              <Card sx={{ border: '2px solid orange', height: '100%' }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <GiftIcon sx={{ color: 'orange', fontSize: 32 }} />
+                      <Box>
+                        <Typography variant="h5" fontWeight="bold">{reward.reward_name}</Typography>
+                        {reward.reward_type && (
+                          <Chip label={reward.reward_type} size="small" sx={{ mt: 0.5, ml: 0.5, fontSize: 12, background: '#f5f5f5' }} />
+                        )}
+                      </Box>
                     </Box>
+                    <Chip
+                      label={qualified ? "Qualified" : "In Progress"}
+                      color={qualified ? "success" : "default"}
+                    />
                   </Box>
-                  <Chip
-                    label={userProgress && userProgress[reward.reward_name + '_qualified'] ? "Qualified" : "In Progress"}
-                    color={userProgress && userProgress[reward.reward_name + '_qualified'] ? "success" : "default"}
-                  />
-                </Box>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                  {reward.description || 'Achieve the targets to qualify for this reward.'}
-                </Typography>
-                {/* Self Investment Progress */}
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2" fontWeight="medium" sx={{ mb: 1 }}>
-                    Self Investment: ${(userProgress?.current_self_investment || 0).toLocaleString()} / ${reward.self_invest_target}
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                    {reward.description || 'Achieve the targets to qualify for this reward.'}
                   </Typography>
-                  <LinearProgress
-                    variant="determinate"
-                    value={Math.min(((userProgress?.current_self_investment || 0) / reward.self_invest_target) * 100, 100)}
-                    sx={{ height: 8, borderRadius: 4 }}
-                  />
-                </Box>
-                {/* Direct Business Progress */}
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2" fontWeight="medium" sx={{ mb: 1 }}>
-                    Direct Business: ${(userProgress?.current_direct_business || 0).toLocaleString()} / ${reward.direct_business_target}
-                  </Typography>
-                  <LinearProgress
-                    variant="determinate"
-                    value={Math.min(((userProgress?.current_direct_business || 0) / reward.direct_business_target) * 100, 100)}
-                    sx={{ height: 8, borderRadius: 4 }}
-                  />
-                </Box>
-                {userProgress && userProgress[reward.reward_name + '_qualified'] ? (
-                  <Alert severity="success">
-                    <Typography variant="body2">
-                      🎉 Congratulations! You're qualified for the {reward.reward_name}!
+                  {/* Self Investment Progress */}
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2" fontWeight="medium" sx={{ mb: 1 }}>
+                      Self Investment: ${(userProgress?.current_self_investment || 0).toLocaleString()} / ${reward.self_invest_target}
                     </Typography>
-                  </Alert>
-                ) : (
-                  <Alert severity="info">
-                    <Typography variant="body2">
-                      Keep investing and building your team to qualify for this reward!
+                    <LinearProgress
+                      variant="determinate"
+                      value={Math.min(((userProgress?.current_self_investment || 0) / reward.self_invest_target) * 100, 100)}
+                      sx={{ height: 8, borderRadius: 4 }}
+                    />
+                  </Box>
+                  {/* Direct Business Progress */}
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2" fontWeight="medium" sx={{ mb: 1 }}>
+                      Direct Business: ${(userProgress?.current_direct_business || 0).toLocaleString()} / ${reward.direct_business_target}
                     </Typography>
-                  </Alert>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
+                    <LinearProgress
+                      variant="determinate"
+                      value={Math.min(((userProgress?.current_direct_business || 0) / reward.direct_business_target) * 100, 100)}
+                      sx={{ height: 8, borderRadius: 4 }}
+                    />
+                  </Box>
+                  {/* Status/Action Section */}
+                  {!qualified && (
+                    <Alert severity="info" sx={{ mt: 2 }}>In Progress</Alert>
+                  )}
+                  {qualified && !appliedStatus && (
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      sx={{ mt: 2 }}
+                      onClick={() => handleApplyReward(reward._id)}
+                    >
+                      Apply
+                    </Button>
+                  )}
+                  {qualified && appliedStatus && (
+                    <Button
+                      variant="outlined"
+                      color="success"
+                      sx={{ mt: 2 }}
+                      disabled
+                    >
+                      Applied
+                    </Button>
+                  )}
+                  {appliedStatus === 'pending' && (
+                    <Alert severity="info" sx={{ mt: 2 }}>Applied (Pending Approval)</Alert>
+                  )}
+                  {appliedStatus === 'approved' && (
+                    <Alert severity="success" sx={{ mt: 2 }}>Reward Approved!</Alert>
+                  )}
+                  {appliedStatus === 'rejected' && (
+                    <Alert severity="error" sx={{ mt: 2 }}>Application Rejected</Alert>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+          );
+        })}
       </Grid>
-
 
     </Box>
   );

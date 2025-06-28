@@ -200,14 +200,13 @@ const InvestmentHistory = () => {
                     <TableCell>Package</TableCell>
                     <TableCell>Amount</TableCell>
                     <TableCell>Daily ROI</TableCell>
-                    <TableCell>Total Earned</TableCell>
                     <TableCell>Status</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {investmentData.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} align="center">
+                      <TableCell colSpan={5} align="center">
                         <Typography variant="body2" sx={{ py: 2 }}>
                           No investment records found
                         </Typography>
@@ -220,7 +219,6 @@ const InvestmentHistory = () => {
                         <TableCell>{investment.extra?.plan_name || 'Trading Package'}</TableCell>
                         <TableCell>{formatCurrency(investment.amount)}</TableCell>
                         <TableCell>{formatCurrency( investment.daily_profit)}</TableCell>
-                        <TableCell>{formatCurrency(investment.total_earnings || 0)}</TableCell>
                         <TableCell>
                           <Chip
                             label={investment.status}

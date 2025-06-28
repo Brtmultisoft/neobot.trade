@@ -285,15 +285,7 @@ const TradingDashboard: React.FC = () => {
           padding: 0,
         }}
       >
-        <CustomGrid item xs={12} sx={{ width: '100%', maxWidth: '100%', padding: boxPadding }}>
-          <Box sx={{ width: '100%', maxWidth: '100%', margin: 0 }}>
-            <MarketTrendVisualization
-              tradingActive={tradingActive}
-              totalProfit={totalProfit}
-              currentPair={currentPair}
-            />
-          </Box>
-        </CustomGrid>
+        
         <CustomGrid item xs={12} sx={{ width: '100%', maxWidth: '100%', padding: boxPadding }}>
           <Box sx={{ width: '100%', maxWidth: '100%', margin: 0 }}>
             <TradingActivation

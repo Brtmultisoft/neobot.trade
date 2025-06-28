@@ -323,6 +323,24 @@ const RewardService = {
 
   async getRewardedUsersForReward(rewardType) {
     return this.getAllRewards({ status: 'approved,completed', reward_type: rewardType });
+  },
+
+  /**
+   * Reject a reward
+   * @param {string} id - Reward ID
+   * @param {string} notes - Reason for rejection
+   * @returns {Promise} API response
+   */
+  async rejectReward(id, notes = '') {
+    const token = localStorage.getItem('admin_token');
+    return ApiService.request({
+      method: 'POST',
+      endpoint: `/admin/rewards/${id}/reject`,
+      data: { notes },
+      token,
+      useCache: false,
+      requestId: `reject-reward-${id}`
+    });
   }
 };
 

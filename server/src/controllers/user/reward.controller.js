@@ -3,6 +3,7 @@
 const Reward = require('../../models/reward.model');
 const { userDbHandler, investmentDbHandler } = require('../../services/db');
 const { ObjectId } = require('mongodb');
+const RewardMaster = require('../../models/reward.master.model');
 
 // Get user's reward status and progress
 const getUserRewardStatus = async (req, res) => {
@@ -271,9 +272,78 @@ const getRewardTargets = async (req, res) => {
   }
 };
 
+// POST /user/rewards/apply
+const applyForReward = async (req, res) => {
+  try {
+    const userId = req.user?.sub;
+    const { reward_id } = req.body;
+    if (!userId || !reward_id) {
+      return res.status(400).json({ success: false, message: 'User ID and reward_id are required' });
+    }
+    // Find reward master
+    const rewardMaster = await RewardMaster.findById(reward_id);
+    if (!rewardMaster) return res.status(404).json({ success: false, message: 'Reward not found' });
+    // Fallback: If reward_type is missing, generate from reward_name
+    let rewardType = rewardMaster.reward_type;
+    if (!rewardType || rewardType.trim() === '') {
+      rewardType = rewardMaster.reward_name.toLowerCase().replace(/ /g, '_');
+    }
+    // Check if already applied
+    const already = await Reward.findOne({ user_id: userId, reward_type: rewardType });
+    if (already) return res.status(400).json({ success: false, message: 'Already applied' });
+
+    // Calculate actual achievements
+    // 1. Self investment
+    const userInvestments = await investmentDbHandler.getByQuery({ user_id: ObjectId(userId), status: 'active' });
+    const selfInvestAchieved = userInvestments.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+    // 2. Direct business
+    const directReferrals = await userDbHandler.getByQuery({ refer_id: ObjectId(userId) });
+    let directBusinessAchieved = 0;
+    for (const referral of directReferrals) {
+      const referralInvestments = await investmentDbHandler.getByQuery({ user_id: referral._id, status: 'active' });
+      directBusinessAchieved += referralInvestments.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+    }
+
+    // Create reward application with all details
+    await Reward.create({
+      user_id: ObjectId(userId),
+      reward_master_id: rewardMaster._id,
+      reward_type: rewardType,
+      reward_name: rewardMaster.reward_name,
+      self_invest_target: rewardMaster.self_invest_target,
+      self_invest_achieved: selfInvestAchieved,
+      direct_business_target: rewardMaster.direct_business_target,
+      direct_business_achieved: directBusinessAchieved,
+      qualification_date: new Date(),
+      status: 'qualified',
+      reward_value: rewardMaster.reward_value,
+      notes: 'User applied manually'
+    });
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Get all reward applications for the logged-in user
+const getUserRewardApplications = async (req, res) => {
+  try {
+    const userId = req.user?.sub;
+    if (!userId) {
+      return res.status(401).json({ status: false, message: 'Unauthorized' });
+    }
+    const rewards = await Reward.find({ user_id: userId }).sort({ qualification_date: -1 });
+    res.json(rewards);
+  } catch (err) {
+    res.status(500).json({ status: false, message: err.message });
+  }
+};
+
 module.exports = {
   getUserRewardStatus,
   getUserRewardHistory,
   getRewardLeaderboard,
-  getRewardTargets
+  getRewardTargets,
+  applyForReward,
+  getUserRewardApplications
 };

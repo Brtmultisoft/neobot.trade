@@ -393,6 +393,7 @@ module.exports = () => {
         console.log('Trigger processing request body:', req.body);
         next();
     }, rewardController.triggerRewardProcessing);
+    Router.post("/rewards/:id/reject", rewardController.rejectReward);
 
     // Health check endpoint
     Router.get("/health", (req, res) => {
@@ -461,6 +462,9 @@ module.exports = () => {
 
     // Link RewardMaster routes
    
+
+    // New investment summary route
+    Router.get("/get-investment-summary", adminUserController.getInvestmentSummary);
 
     /**************************
      * END OF AUTHORIZED ROUTES
