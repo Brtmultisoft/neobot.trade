@@ -11,6 +11,10 @@ import {
   Divider,
   useTheme,
   IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -39,9 +43,9 @@ const BuyPackage = () => {
   const [amount, setAmount] = useState('');
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [error, setError] = useState('');
-  const [showConfirmation, setShowConfirmation] = useState(false);
   const [showAmountInput, setShowAmountInput] = useState(false);
   const [favorite, setFavorite] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -75,9 +79,8 @@ const BuyPackage = () => {
   // Handle successful investment
   useEffect(() => {
     if (investmentData?.result) {
-      setShowConfirmation(false);
-
-      // Show success message
+      setShowAmountInput(false);
+      setModalOpen(false);
       Swal.fire({
         title: 'Success!',
         text: 'Your investment has been successfully processed.',
@@ -121,7 +124,7 @@ const BuyPackage = () => {
       }
 
       setError(errorMessage);
-      setShowConfirmation(false);
+      setShowAmountInput(false);
     }
   }, [investmentError]);
 
@@ -142,6 +145,7 @@ const BuyPackage = () => {
     setAmount('');
     setError('');
     setShowAmountInput(true);
+    setModalOpen(true);
   };
 
   const handleAmountChange = (e) => {
@@ -185,35 +189,20 @@ const BuyPackage = () => {
     if (!validateAmount()) {
       return;
     }
-
-    setShowConfirmation(true);
+    handleConfirmInvestment();
   };
 
   const handleConfirmInvestment = async () => {
     try {
       const investmentAmount = parseFloat(amount);
-
-      // Clear any existing errors
       setError('');
-
       await addInvestment({
         amount: investmentAmount,
         package_id: selectedPlan._id,
         daily_profit: selectedPlan.daily_trading_roi
       });
-
-      console.log('Referral bonus check:', {
-        referrer_id: referrer._id,
-        referred_user_id: user_id,
-        referrer_total_investment: referrer.total_investment,
-        existingReferralBonus
-      });
     } catch (error) {
-      console.error('Investment error:', error);
-
-      // Handle different types of error responses
       let errorMessage = 'Failed to process investment';
-
       if (error.msg) {
         errorMessage = error.msg;
       } else if (error.message) {
@@ -225,29 +214,16 @@ const BuyPackage = () => {
       } else if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
       }
-
-      // Make error messages more user-friendly
-      if (errorMessage.includes('Insufficient top-up wallet balance')) {
-        errorMessage = `Insufficient balance in your top-up wallet. Available: ${formatCurrency(user?.wallet_topup || 0)}`;
-      } else if (errorMessage.includes('Investment amount must be more than $50')) {
-        errorMessage = 'Minimum investment amount is $50. Please increase your investment amount.';
-      } else if (errorMessage.includes('User not found')) {
-        errorMessage = 'Account verification failed. Please try logging in again.';
-      } else if (errorMessage.includes('Network Error') || errorMessage.includes('fetch')) {
-        errorMessage = 'Network connection failed. Please check your internet connection and try again.';
-      } else if (errorMessage.includes('timeout')) {
-        errorMessage = 'Request timed out. Please try again.';
-      } else if (errorMessage.includes('500') || errorMessage.includes('Internal Server Error')) {
-        errorMessage = 'Server error occurred. Please try again later or contact support.';
-      }
-
       setError(errorMessage);
-      setShowConfirmation(false);
     }
   };
 
-  const handleCancelConfirmation = () => {
-    setShowConfirmation(false);
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setShowAmountInput(false);
+    setSelectedPlan(null);
+    setAmount('');
+    setError('');
   };
 
   const handleBack = () => {
@@ -1102,201 +1078,6 @@ const BuyPackage = () => {
           </Paper>
         )}
 
-        {/* Amount Input Section - Only show when package is selected */}
-        {showAmountInput && selectedPlan && (
-          <Paper
-            elevation={0}
-            sx={{
-              p: { xs: 2, sm: 3 },
-              borderRadius: 3,
-              backgroundColor: mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(255, 255, 255, 1)',
-              border: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.1)' : '#E6E8EA'}`,
-              mb: 3,
-              boxShadow: mode === 'dark'
-                ? '0 8px 20px rgba(0,0,0,0.05)'
-                : '0 2px 8px rgba(0, 0, 0, 0.03)',
-              animation: 'fadeInUp 0.6s ease-out',
-              '@keyframes fadeInUp': {
-                '0%': { opacity: 0, transform: 'translateY(20px)' },
-                '100%': { opacity: 1, transform: 'translateY(0)' },
-              },
-            }}
-          >
-            <Typography
-              variant="h6"
-              fontWeight="600"
-              sx={{
-                mb: 3,
-                display: 'flex',
-                alignItems: 'center',
-                color: mode === 'dark' ? theme.palette.primary.main : '#000',
-                textShadow: mode === 'dark' ? '0 0 1px rgba(51, 117, 187, 0.2)' : 'none',
-                '&::before': {
-                  content: '""',
-                  display: 'inline-block',
-                  width: 4,
-                  height: 24,
-                  backgroundColor: mode === 'dark' ? theme.palette.primary.main : '#000',
-                  marginRight: 1.5,
-                  borderRadius: 4,
-                  boxShadow: mode === 'dark' ? '0 0 8px rgba(51, 117, 187, 0.5)' : 'none',
-                }
-              }}
-            >
-              Investment Amount
-            </Typography>
-
-            {/* Amount Input Field */}
-            <TextField
-              fullWidth
-              label="Enter Amount"
-              value={amount}
-              onChange={handleAmountChange}
-              type="number"
-              error={!!error && (error.includes('amount') || error.includes('balance') || error.includes('Minimum') || error.includes('Maximum'))}
-              helperText={
-                error && (error.includes('amount') || error.includes('balance') || error.includes('Minimum') || error.includes('Maximum'))
-                  ? error
-                  : `Range: ${formatCurrency(selectedPlan?.trading_amount_from || 0)} - ${selectedPlan?.is_unlimited ? 'Unlimited' : formatCurrency(selectedPlan?.trading_amount_to || 0)}`
-              }
-              slotProps={{
-                input: {
-                  min: selectedPlan?.trading_amount_from || 0,
-                  max: selectedPlan?.is_unlimited ? undefined : selectedPlan?.trading_amount_to,
-                  step: "0.01"
-                }
-              }}
-              sx={{
-                mb: 3,
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 2,
-                  fontSize: '1.1rem',
-                  fontWeight: 'bold',
-                  backgroundColor: mode === 'dark' ? 'rgba(0,0,0,0.2)' : 'rgba(245, 247, 250, 0.8)',
-                  '&:hover fieldset': {
-                    borderColor: theme.palette.primary.main,
-                  },
-                  '&.Mui-focused fieldset': {
-                    borderColor: theme.palette.primary.main,
-                    borderWidth: 2,
-                  },
-                  '&.Mui-error fieldset': {
-                    borderColor: '#f44336',
-                    borderWidth: 2,
-                  },
-                },
-                '& .MuiInputLabel-root': {
-                  color: mode === 'dark' ? theme.palette.text.secondary : '#6E7C87',
-                  '&.Mui-focused': {
-                    color: theme.palette.primary.main,
-                  },
-                  '&.Mui-error': {
-                    color: '#f44336',
-                  },
-                },
-                '& .MuiFormHelperText-root': {
-                  fontSize: '0.875rem',
-                  fontWeight: 'medium',
-                  marginTop: 1,
-                  '&.Mui-error': {
-                    color: '#f44336',
-                    fontWeight: 'bold',
-                  },
-                },
-              }}
-              placeholder={`Min: ${formatCurrency(selectedPlan?.trading_amount_from || 0)}`}
-            />
-
-            {/* ROI Calculations */}
-            {amount && parseFloat(amount) > 0 && (
-              <Box
-                sx={{
-                  p: 3,
-                  borderRadius: 3,
-                  backgroundColor: mode === 'dark' ? 'rgba(14, 203, 129, 0.1)' : 'rgba(14, 203, 129, 0.05)',
-                  border: `2px solid ${mode === 'dark' ? 'rgba(14, 203, 129, 0.3)' : 'rgba(14, 203, 129, 0.2)'}`,
-                  mb: 3,
-                  animation: 'fadeIn 0.5s ease-out',
-                  '@keyframes fadeIn': {
-                    '0%': { opacity: 0, transform: 'translateY(10px)' },
-                    '100%': { opacity: 1, transform: 'translateY(0)' },
-                  },
-                }}
-              >
-                <Typography
-                  variant="h6"
-                  fontWeight="bold"
-                  sx={{
-                    color: '#0ECB81',
-                    mb: 2,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1,
-                  }}
-                >
-                  📊 Investment Returns
-                </Typography>
-
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}>
-                    <Box sx={{ textAlign: 'center', p: 2, borderRadius: 2, backgroundColor: mode === 'dark' ? 'rgba(0,0,0,0.2)' : 'rgba(255, 255, 255, 0.8)' }}>
-                      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold' }}>
-                        Monthly Returns
-                      </Typography>
-                      <Typography variant="h5" fontWeight="bold" sx={{ color: '#0ECB81', mb: 0.5 }}>
-                        {getMonthlyRoi(selectedPlan).toFixed(2)}%
-                      </Typography>
-                      <Typography variant="body2" fontWeight="bold" sx={{ color: '#0ECB81' }}>
-                        {formatCurrency(parseFloat(amount) * (getMonthlyRoi(selectedPlan) / 100))}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        in 30 days
-                      </Typography>
-                    </Box>
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    <Box
-                      sx={{
-                        textAlign: 'center',
-                        p: 2,
-                        borderRadius: 2,
-                        backgroundColor: mode === 'dark' ? 'rgba(14, 203, 129, 0.2)' : 'rgba(14, 203, 129, 0.1)',
-                        border: `1px solid ${mode === 'dark' ? 'rgba(14, 203, 129, 0.4)' : 'rgba(14, 203, 129, 0.3)'}`,
-                      }}
-                    >
-                      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold' }}>
-                        Total Investment
-                      </Typography>
-                      <Typography variant="h4" fontWeight="bold" sx={{ color: '#0ECB81', mb: 0.5 }}>
-                        {formatCurrency(parseFloat(amount))}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                </Grid>
-              </Box>
-            )}
-
-            {/* Balance Info */}
-            <Box
-              sx={{
-                p: 2,
-                borderRadius: 2,
-                backgroundColor: mode === 'dark' ? 'rgba(0,0,0,0.2)' : 'rgba(245, 247, 250, 0.8)',
-                border: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`,
-                mb: 3,
-              }}
-            >
-              <Typography variant="caption" color="text.secondary">
-                Available Balance
-              </Typography>
-              <Typography variant="h6" fontWeight="bold" sx={{ color: '#0ECB81' }}>
-                {formatCurrency(user?.wallet_topup || 0)}
-              </Typography>
-            </Box>
-          </Paper>
-        )}
-
         {/* Error Message */}
         {error && (
           <Alert
@@ -1346,385 +1127,186 @@ const BuyPackage = () => {
           </Alert>
         )}
 
-        {/* Action Button - Only show when amount input is active */}
-        {showAmountInput && selectedPlan && (
-        <Box
-          sx={{
-            mt: 'auto',
-            position: 'relative',
-            animation: 'fadeIn 0.6s ease-out 0.4s both',
-            '@keyframes fadeIn': {
-              '0%': { opacity: 0, transform: 'translateY(10px)' },
-              '100%': { opacity: 1, transform: 'translateY(0)' },
-            }
+        {/* Modal for Amount Input and Confirmation */}
+        <Dialog
+          open={modalOpen}
+          onClose={handleCloseModal}
+          fullWidth
+          maxWidth="xs"
+          PaperProps={{
+            sx: {
+              borderRadius: 3,
+              p: { xs: 2, sm: 3 },
+              backgroundColor: mode === 'dark' ? '#181818' : '#fff',
+              color: mode === 'dark' ? '#fff' : '#181818',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+              minWidth: { xs: '90vw', sm: 400 },
+            },
           }}
         >
-          {/* Animated gradient border */}
-          <Box
-            sx={{
-              position: 'absolute',
-              top: -3,
-              left: -3,
-              right: -3,
-              bottom: -3,
-              borderRadius: 3,
-              background: 'linear-gradient(90deg, #3375BB, #2A5F9E, #3375BB)',
-              backgroundSize: '200% 200%',
-              animation: 'gradient 2s ease infinite',
-              opacity: 0.7,
-              filter: 'blur(8px)',
-              '@keyframes gradient': {
-                '0%': { backgroundPosition: '0% 50%' },
-                '50%': { backgroundPosition: '100% 50%' },
-                '100%': { backgroundPosition: '0% 50%' },
-              },
-              zIndex: 0,
-            }}
-          />
-
-          <Button
-            fullWidth
-            variant="contained"
-            size="large"
-            onClick={handleSubmit}
-            disabled={!amount || !selectedPlan || investmentLoading}
-            sx={{
-              py: { xs: 1.5, sm: 2 },
-              borderRadius: 2,
-              backgroundColor: '#3375BB',
-              backgroundImage: 'linear-gradient(135deg, #3375BB 0%, #2A5F9E 100%)',
-              fontSize: { xs: '1rem', sm: '1.1rem' },
-              fontWeight: 'bold',
-              letterSpacing: '0.5px',
-              boxShadow: '0 10px 20px rgba(51, 117, 187, 0.3)',
-              position: 'relative',
-              zIndex: 1,
-              transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-              '&:hover': {
-                backgroundColor: '#2A5F9E',
-                transform: 'translateY(-3px)',
-                boxShadow: '0 15px 30px rgba(51, 117, 187, 0.4)',
-              },
-              '&:active': {
-                transform: 'translateY(-1px)',
-                boxShadow: '0 5px 15px rgba(51, 117, 187, 0.4)',
-              },
-              '&.Mui-disabled': {
-                backgroundColor: mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
-                color: mode === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)',
-              }
-            }}
-          >
-            {investmentLoading ? (
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <CircularProgress
-                  size={24}
-                  sx={{
-                    color: 'inherit',
-                    mr: 1,
-                    animation: 'spin 1s linear infinite, pulse-opacity 2s ease-in-out infinite',
-                    '@keyframes pulse-opacity': {
-                      '0%': { opacity: 0.6 },
-                      '50%': { opacity: 1 },
-                      '100%': { opacity: 0.6 },
-                    },
-                  }}
-                />
-                Processing...
-              </Box>
-            ) : (
+          <DialogTitle sx={{
+            fontWeight: 'bold',
+            color: '#FFD700',
+            textAlign: 'center',
+            pb: 0,
+            fontSize: '1.3rem',
+            background: 'none',
+            letterSpacing: 1,
+          }}>
+            Buy {selectedPlan?.name} Package
+          </DialogTitle>
+          <DialogContent sx={{
+            color: mode === 'dark' ? '#fff' : '#181818',
+            background: 'none',
+          }}>
+            {selectedPlan && (
               <>
-                Buy {selectedPlan?.name || 'Package'}
-                <Box
-                  component="span"
-                  sx={{
-                    display: 'inline-block',
-                    ml: 1,
-                    animation: 'bounce 1s infinite',
-                    '@keyframes bounce': {
-                      '0%, 100%': { transform: 'translateX(0)' },
-                      '50%': { transform: 'translateX(5px)' },
+                <Typography variant="body2" sx={{ color: mode === 'dark' ? '#fff' : '#181818', mb: 2 }}>
+                  {selectedPlan.description}
+                </Typography>
+                <TextField
+                  fullWidth
+                  label="Enter Amount"
+                  value={amount}
+                  onChange={handleAmountChange}
+                  type="number"
+                  error={!!error && (error.includes('amount') || error.includes('balance') || error.includes('Minimum') || error.includes('Maximum'))}
+                  helperText={
+                    error && (error.includes('amount') || error.includes('balance') || error.includes('Minimum') || error.includes('Maximum'))
+                      ? error
+                      : `Range: ${formatCurrency(selectedPlan?.trading_amount_from || 0)} - ${selectedPlan?.is_unlimited ? 'Unlimited' : formatCurrency(selectedPlan?.trading_amount_to || 0)}`
+                  }
+                  slotProps={{
+                    input: {
+                      min: selectedPlan?.trading_amount_from || 0,
+                      max: selectedPlan?.is_unlimited ? undefined : selectedPlan?.trading_amount_to,
+                      step: "0.01"
                     }
                   }}
-                >
-                  →
+                  sx={{
+                    mb: 3,
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                      fontSize: '1.1rem',
+                      fontWeight: 'bold',
+                      backgroundColor: mode === 'dark' ? '#222' : 'rgba(245, 247, 250, 0.8)',
+                      color: mode === 'dark' ? '#fff' : '#181818',
+                      '& fieldset': {
+                        borderColor: '#FFD700',
+                      },
+                      '&:hover fieldset': {
+                        borderColor: '#FFD700',
+                      },
+                      '&.Mui-focused fieldset': {
+                        borderColor: '#FFD700',
+                        borderWidth: 2,
+                      },
+                      '&.Mui-error fieldset': {
+                        borderColor: '#f44336',
+                        borderWidth: 2,
+                      },
+                    },
+                    '& .MuiInputLabel-root': {
+                      color: mode === 'dark' ? '#FFD700' : '#181818',
+                      '&.Mui-focused': {
+                        color: '#FFD700',
+                      },
+                      '&.Mui-error': {
+                        color: '#f44336',
+                      },
+                    },
+                    '& .MuiFormHelperText-root': {
+                      fontSize: '0.875rem',
+                      fontWeight: 'medium',
+                      marginTop: 1,
+                      color: mode === 'dark' ? '#FFD700' : '#181818',
+                      '&.Mui-error': {
+                        color: '#f44336',
+                        fontWeight: 'bold',
+                      },
+                    },
+                  }}
+                  placeholder={`Min: ${formatCurrency(selectedPlan?.trading_amount_from || 0)}`}
+                />
+                {amount && parseFloat(amount) > 0 && (
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="caption" color={mode === 'dark' ? '#FFD700' : '#181818'}>
+                      Monthly Returns
+                    </Typography>
+                    <Typography variant="h6" fontWeight="bold" sx={{ color: '#FFD700' }}>
+                      {getMonthlyRoi(selectedPlan).toFixed(2)}% ({formatCurrency(parseFloat(amount) * (getMonthlyRoi(selectedPlan) / 100))})
+                    </Typography>
+                  </Box>
+                )}
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="caption" color={mode === 'dark' ? '#FFD700' : '#181818'}>
+                    Available Balance
+                  </Typography>
+                  <Typography variant="h6" fontWeight="bold" sx={{ color: '#FFD700' }}>
+                    {formatCurrency(user?.wallet_topup || 0)}
+                  </Typography>
                 </Box>
               </>
             )}
-          </Button>
-        </Box>
-        )}
-      </Box>
-
-      {/* Enhanced Confirmation Dialog */}
-      {showConfirmation && (
-        <Box
-          sx={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
-            backdropFilter: 'blur(5px)',
-            zIndex: 1300,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            p: 2,
-            animation: 'fadeIn 0.3s ease-out',
-            '@keyframes fadeIn': {
-              '0%': { opacity: 0 },
-              '100%': { opacity: 1 },
-            }
-          }}
-          onClick={handleCancelConfirmation}
-        >
-          <Paper
-            sx={{
-              width: '100%',
-              maxWidth: 420,
-              p: { xs: 3, sm: 4 },
-              borderRadius: 3,
-              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
-              animation: 'slideUp 0.4s ease-out',
-              '@keyframes slideUp': {
-                '0%': { transform: 'translateY(50px)', opacity: 0 },
-                '100%': { transform: 'translateY(0)', opacity: 1 },
-              },
-              position: 'relative',
-              overflow: 'hidden',
-              border: mode === 'dark' ? '1px solid rgba(255,255,255,0.1)' : 'none',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Background gradient */}
-            <Box
+            {error && (
+              <Alert severity="error" variant="filled" onClose={() => setError('')} sx={{ mb: 2 }}>
+                {error}
+              </Alert>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ flexDirection: 'column', gap: 1, px: 3, pb: 2, background: 'none' }}>
+            <Button
+              fullWidth
+              variant="contained"
+              size="large"
+              onClick={handleSubmit}
+              disabled={!amount || !selectedPlan || investmentLoading}
               sx={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                height: 6,
-                background: 'linear-gradient(90deg, #3375BB, #2A5F9E)',
+                py: 1.5,
+                borderRadius: 2,
+                backgroundColor: '#FFD700',
+                color: mode === 'dark' ? '#181818' : '#181818',
+                fontWeight: 'bold',
+                fontSize: '1rem',
+                boxShadow: '0 10px 20px rgba(255, 215, 0, 0.15)',
+                '&:hover': {
+                  backgroundColor: '#FFC300',
+                },
+                '&.Mui-disabled': {
+                  backgroundColor: mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                  color: mode === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)',
+                }
               }}
-            />
-
-            <Box sx={{ position: 'relative' }}>
-              {/* Header */}
-              <Box sx={{ textAlign: 'center', mb: 3 }}>
-                <Box
-                  sx={{
-                    width: 70,
-                    height: 70,
-                    borderRadius: '50%',
-                    backgroundColor: 'rgba(51, 117, 187, 0.1)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 auto 16px',
-                    animation: 'pulse 2s infinite',
-                    '@keyframes pulse': {
-                      '0%': { boxShadow: '0 0 0 0 rgba(51, 117, 187, 0.4)' },
-                      '70%': { boxShadow: '0 0 0 15px rgba(51, 117, 187, 0)' },
-                      '100%': { boxShadow: '0 0 0 0 rgba(51, 117, 187, 0)' },
-                    }
-                  }}
-                >
-                  <ShoppingCartIcon sx={{ fontSize: 32, color: theme.palette.primary.main }} />
+            >
+              {investmentLoading ? (
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <CircularProgress size={24} sx={{ color: 'inherit', mr: 1 }} />
+                  Processing...
                 </Box>
-                <Typography
-                  variant="h5"
-                  fontWeight="bold"
-                  gutterBottom
-                  sx={{ color: theme.palette.primary.main }}
-                >
-                  Confirm Purchase
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Please review your investment details before confirming
-                </Typography>
-              </Box>
-
-              <Divider sx={{ my: 2, borderColor: mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }} />
-
-              {/* Investment Details */}
-              <Box
-                sx={{
-                  mb: 3,
-                  p: 2,
-                  borderRadius: 2,
-                  backgroundColor: mode === 'dark' ? 'rgba(0,0,0,0.2)' : 'rgba(245, 247, 250, 0.8)',
-                  backdropFilter: 'blur(10px)',
-                  border: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`,
-                  boxShadow: mode === 'dark' ? '0 4px 20px rgba(0,0,0,0.2)' : '0 4px 20px rgba(0,0,0,0.05)',
-                  animation: 'fadeIn 0.5s ease-out',
-                  '@keyframes fadeIn': {
-                    '0%': { opacity: 0, transform: 'translateY(10px)' },
-                    '100%': { opacity: 1, transform: 'translateY(0)' },
-                  },
-                }}
-              >
-                <Grid container spacing={2}>
-                  <Grid item xs={6}>
-                    <Typography variant="caption" color="text.secondary">
-                      Package
-                    </Typography>
-                    <Typography
-                      variant="body1"
-                      fontWeight="bold"
-                      sx={{ color: mode === 'dark' ? '#fff' : '#000' }}
-                    >
-                      {selectedPlan?.name}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Typography variant="caption" color="text.secondary">
-                      Investment Amount
-                    </Typography>
-                    <Typography
-                      variant="body1"
-                      fontWeight="bold"
-                      sx={{ color: theme.palette.primary.main }}
-                    >
-                      {formatCurrency(parseFloat(amount))}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Typography variant="caption" color="text.secondary">
-                      Monthly Returns
-                    </Typography>
-                    <Typography
-                      variant="body1"
-                      fontWeight="bold"
-                      sx={{ color: '#0ECB81' }}
-                    >
-                      {getMonthlyRoi(selectedPlan).toFixed(2)}%
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Typography variant="caption" color="text.secondary">
-                      Monthly Return Amount
-                    </Typography>
-                    <Typography
-                      variant="body1"
-                      fontWeight="bold"
-                      sx={{ color: '#0ECB81' }}
-                    >
-                      {formatCurrency(parseFloat(amount) * (getMonthlyRoi(selectedPlan) / 100))}
-                    </Typography>
-                  </Grid>
-                </Grid>
-              </Box>
-
-              {/* Total Summary */}
-              <Box
-                sx={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  mb: 3,
-                  p: 2,
-                  borderRadius: 2,
-                  backgroundColor: mode === 'dark' ? 'rgba(51, 117, 187, 0.1)' : 'rgba(0, 0, 0, 0.03)',
-                  border: `1px solid ${mode === 'dark' ? 'rgba(51, 117, 187, 0.2)' : 'rgba(0, 0, 0, 0.05)'}`,
-                  boxShadow: mode === 'dark' ? '0 4px 12px rgba(51, 117, 187, 0.1)' : '0 4px 12px rgba(0, 0, 0, 0.03)',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  '&::before': {
-                    content: '""',
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                    background: mode === 'dark'
-                      ? 'linear-gradient(135deg, rgba(51, 117, 187, 0.2) 0%, transparent 100%)'
-                      : 'linear-gradient(135deg, rgba(0, 0, 0, 0.02) 0%, transparent 100%)',
-                    zIndex: 0,
-                  },
-                  animation: 'fadeIn 0.5s ease-out 0.2s both',
-                  '@keyframes fadeIn': {
-                    '0%': { opacity: 0, transform: 'translateY(10px)' },
-                    '100%': { opacity: 1, transform: 'translateY(0)' },
-                  },
-                }}
-              >
-                <Typography variant="subtitle1" fontWeight="medium">
-                  Total Investment
-                </Typography>
-                <Typography
-                  variant="h6"
-                  fontWeight="bold"
-                  sx={{ color: theme.palette.primary.main }}
-                >
-                  {formatCurrency(parseFloat(amount))}
-                </Typography>
-              </Box>
-
-              {/* Action Buttons */}
-              <Box sx={{ display: 'flex', gap: 2 }}>
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  onClick={handleCancelConfirmation}
-                  sx={{
-                    py: 1.5,
-                    borderRadius: 2,
-                    borderColor: mode === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)',
-                    color: mode === 'dark' ? '#fff' : '#000',
-                    '&:hover': {
-                      borderColor: mode === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)',
-                      backgroundColor: mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
-                    }
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  fullWidth
-                  variant="contained"
-                  onClick={handleConfirmInvestment}
-                  disabled={investmentLoading}
-                  sx={{
-                    py: 1.5,
-                    borderRadius: 2,
-                    backgroundColor: '#3375BB',
-                    backgroundImage: investmentLoading
-                      ? 'linear-gradient(135deg, #9E9E9E 0%, #757575 100%)'
-                      : 'linear-gradient(135deg, #3375BB 0%, #2A5F9E 100%)',
-                    fontWeight: 'bold',
-                    boxShadow: investmentLoading
-                      ? '0 4px 12px rgba(158, 158, 158, 0.3)'
-                      : '0 8px 16px rgba(51, 117, 187, 0.3)',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      backgroundColor: investmentLoading ? '#9E9E9E' : '#2A5F9E',
-                      transform: investmentLoading ? 'none' : 'translateY(-2px)',
-                      boxShadow: investmentLoading
-                        ? '0 4px 12px rgba(158, 158, 158, 0.3)'
-                        : '0 12px 20px rgba(51, 117, 187, 0.4)',
-                    },
-                    '&:disabled': {
-                      color: '#fff',
-                      opacity: 0.9,
-                    },
-                  }}
-                >
-                  {investmentLoading ? (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <CircularProgress size={20} sx={{ color: '#fff' }} />
-                      Processing Investment...
-                    </Box>
-                  ) : (
-                    'Confirm Purchase'
-                  )}
-                </Button>
-              </Box>
-            </Box>
-          </Paper>
-        </Box>
-      )}
+              ) : (
+                `Buy ${selectedPlan?.name || 'Package'}`
+              )}
+            </Button>
+            <Button
+              fullWidth
+              variant="outlined"
+              onClick={handleCloseModal}
+              sx={{
+                py: 1.5,
+                borderRadius: 2,
+                borderColor: '#FFD700',
+                color: '#FFD700',
+                '&:hover': {
+                  borderColor: '#FFC300',
+                  backgroundColor: mode === 'dark' ? 'rgba(255, 215, 0, 0.08)' : 'rgba(255, 215, 0, 0.05)',
+                },
+              }}
+            >
+              Cancel
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </Box>
     </Box>
   );
 };

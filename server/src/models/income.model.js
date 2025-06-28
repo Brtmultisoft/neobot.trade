@@ -20,7 +20,7 @@ const incomeSchema = new Schema({
     },
     type: {
         type: String,
-        enum: ['daily_profit', 'first_deposit_bonus', 'referral_bonus', 'team_commission', 'active_member_reward', 'trade_booster', 'level_roi_income', 'team_reward'],
+        enum: ['daily_profit', 'first_deposit_bonus', 'referral_bonus', 'team_commission', 'active_member_reward', 'trade_booster', 'level_roi_income', 'team_reward', 'reward_approved'],
         required: true
     },
     amount: {

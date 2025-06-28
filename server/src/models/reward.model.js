@@ -37,7 +37,7 @@ const rewardSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['qualified', 'approved', 'processed', 'completed'],
+        enum: ['qualified', 'approved', 'processed', 'completed', 'rejected'],
         default: 'qualified'
     },
     reward_value: {

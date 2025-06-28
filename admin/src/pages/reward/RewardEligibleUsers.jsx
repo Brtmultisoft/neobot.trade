@@ -2,8 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import ApiService from '../../services/api.service';
 import {
   Card, CardContent, Typography, Box, Table, TableHead, TableBody, TableRow, TableCell,
-  TableSortLabel, TablePagination, TextField, Alert, Chip
+  TableSortLabel, TablePagination, TextField, Alert, Chip, useMediaQuery, Stack
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 
 const RewardEligibleUsers = () => {
   const [allUsers, setAllUsers] = useState([]);
@@ -13,6 +14,9 @@ const RewardEligibleUsers = () => {
   const [sortDirection, setSortDirection] = useState('desc');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(20);
+
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   // Fetch all users with their investment summary (with eligibleRewards from backend)
   useEffect(() => {
@@ -104,17 +108,23 @@ const RewardEligibleUsers = () => {
   };
 
   return (
-    <Box p={3}>
-      <Typography variant="h4" fontWeight="bold" mb={1} textAlign="center">
+    <Box p={{ xs: 1, sm: 3 }}>
+      <Typography variant={isMobile ? 'h5' : 'h4'} fontWeight="bold" mb={1} textAlign="center">
         User Reward Tracking
       </Typography>
-      <Typography variant="subtitle1" color="text.secondary" mb={3} textAlign="center">
+      <Typography variant={isMobile ? 'body2' : 'subtitle1'} color="text.secondary" mb={3} textAlign="center">
         Track all users' self investment, direct business, and reward eligibility. Use search, sorting, and filters for admin insights.
       </Typography>
       <Card sx={{ maxWidth: 1200, margin: '0 auto', mb: 4, boxShadow: 3 }}>
         <CardContent>
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Stack
+            direction={isMobile ? 'column' : 'row'}
+            spacing={2}
+            justifyContent="space-between"
+            alignItems={isMobile ? 'stretch' : 'center'}
+            mb={2}
+          >
             <Typography variant="body1" fontWeight="bold">
               Total Users: {processedUsers.length}
             </Typography>
@@ -124,88 +134,90 @@ const RewardEligibleUsers = () => {
               placeholder="Search by username or email"
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(0); }}
-              sx={{ minWidth: 260 }}
+              sx={{ minWidth: isMobile ? 0 : 260, width: isMobile ? '100%' : undefined }}
             />
-          </Box>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell sortDirection={sortBy === 'username' ? sortDirection : false}>
-                  <TableSortLabel
-                    active={sortBy === 'username'}
-                    direction={sortBy === 'username' ? sortDirection : 'asc'}
-                    onClick={() => handleSort('username')}
-                  >
-                    Username
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell sortDirection={sortBy === 'email' ? sortDirection : false}>
-                  <TableSortLabel
-                    active={sortBy === 'email'}
-                    direction={sortBy === 'email' ? sortDirection : 'asc'}
-                    onClick={() => handleSort('email')}
-                  >
-                    Email
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell sortDirection={sortBy === 'self_investment' ? sortDirection : false} align="right">
-                  <TableSortLabel
-                    active={sortBy === 'self_investment'}
-                    direction={sortBy === 'self_investment' ? sortDirection : 'desc'}
-                    onClick={() => handleSort('self_investment')}
-                  >
-                    Self Invest
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell sortDirection={sortBy === 'direct_business' ? sortDirection : false} align="right">
-                  <TableSortLabel
-                    active={sortBy === 'direct_business'}
-                    direction={sortBy === 'direct_business' ? sortDirection : 'desc'}
-                    onClick={() => handleSort('direct_business')}
-                  >
-                    Direct Business
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell>Eligible Rewards</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {paginatedUsers.length === 0 ? (
+          </Stack>
+          <Box sx={{ width: '100%', overflowX: 'auto' }}>
+            <Table size="small" sx={{ minWidth: 600 }}>
+              <TableHead>
                 <TableRow>
-                  <TableCell colSpan={5} align="center">
-                    <Typography color="text.secondary">No users found.</Typography>
+                  <TableCell sortDirection={sortBy === 'username' ? sortDirection : false} sx={{ minWidth: 120 }}>
+                    <TableSortLabel
+                      active={sortBy === 'username'}
+                      direction={sortBy === 'username' ? sortDirection : 'asc'}
+                      onClick={() => handleSort('username')}
+                    >
+                      Username
+                    </TableSortLabel>
                   </TableCell>
+                  <TableCell sortDirection={sortBy === 'email' ? sortDirection : false} sx={{ minWidth: 160 }}>
+                    <TableSortLabel
+                      active={sortBy === 'email'}
+                      direction={sortBy === 'email' ? sortDirection : 'asc'}
+                      onClick={() => handleSort('email')}
+                    >
+                      Email
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sortDirection={sortBy === 'self_investment' ? sortDirection : false} align="right" sx={{ minWidth: 100 }}>
+                    <TableSortLabel
+                      active={sortBy === 'self_investment'}
+                      direction={sortBy === 'self_investment' ? sortDirection : 'desc'}
+                      onClick={() => handleSort('self_investment')}
+                    >
+                      Self Invest
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sortDirection={sortBy === 'direct_business' ? sortDirection : false} align="right" sx={{ minWidth: 120 }}>
+                    <TableSortLabel
+                      active={sortBy === 'direct_business'}
+                      direction={sortBy === 'direct_business' ? sortDirection : 'desc'}
+                      onClick={() => handleSort('direct_business')}
+                    >
+                      Direct Business
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sx={{ minWidth: 160 }}>Eligible Rewards</TableCell>
                 </TableRow>
-              ) : (
-                paginatedUsers.map(user => (
-                  <TableRow key={user._id}>
-                    <TableCell>{user.username}</TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell align="right">{user.self_investment}</TableCell>
-                    <TableCell align="right">{user.direct_business}</TableCell>
-                    <TableCell>
-                      {user.eligibleRewards && user.eligibleRewards.length > 0 ? user.eligibleRewards.map(rw => (
-                        <Chip
-                          key={rw.reward_id || rw.reward_name}
-                          label={rw.reward_name}
-                          color="success"
-                          size="small"
-                          sx={{ mr: 0.5, mb: 0.5 }}
-                        />
-                      )) : <Typography variant="caption" color="text.secondary">-</Typography>}
+              </TableHead>
+              <TableBody>
+                {paginatedUsers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center">
+                      <Typography color="text.secondary">No users found.</Typography>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-              {/* Summary row */}
-              <TableRow sx={{ background: '#f5f5f5' }}>
-                <TableCell colSpan={2} align="right"><b>Total</b></TableCell>
-                <TableCell align="right"><b>{totalSelfInvestment}</b></TableCell>
-                <TableCell align="right"><b>{totalDirectBusiness}</b></TableCell>
-                <TableCell></TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
+                ) : (
+                  paginatedUsers.map(user => (
+                    <TableRow key={user._id}>
+                      <TableCell sx={{ wordBreak: 'break-word' }}>{user.username}</TableCell>
+                      <TableCell sx={{ wordBreak: 'break-word' }}>{user.email}</TableCell>
+                      <TableCell align="right">{user.self_investment}</TableCell>
+                      <TableCell align="right">{user.direct_business}</TableCell>
+                      <TableCell>
+                        {user.eligibleRewards && user.eligibleRewards.length > 0 ? user.eligibleRewards.map(rw => (
+                          <Chip
+                            key={rw.reward_id || rw.reward_name}
+                            label={rw.reward_name}
+                            color="success"
+                            size="small"
+                            sx={{ mr: 0.5, mb: 0.5 }}
+                          />
+                        )) : <Typography variant="caption" color="text.secondary">-</Typography>}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+                {/* Summary row */}
+                <TableRow sx={{ background: '#f5f5f5' }}>
+                  <TableCell colSpan={2} align="right"><b>Total</b></TableCell>
+                  <TableCell align="right"><b>{totalSelfInvestment}</b></TableCell>
+                  <TableCell align="right"><b>{totalDirectBusiness}</b></TableCell>
+                  <TableCell></TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </Box>
           <TablePagination
             component="div"
             count={processedUsers.length}
@@ -214,6 +226,16 @@ const RewardEligibleUsers = () => {
             rowsPerPage={rowsPerPage}
             onRowsPerPageChange={handleChangeRowsPerPage}
             rowsPerPageOptions={[20, 50, 100]}
+            sx={{
+              '.MuiTablePagination-toolbar': {
+                flexDirection: isMobile ? 'column' : 'row',
+                alignItems: isMobile ? 'flex-start' : 'center',
+                gap: isMobile ? 1 : 0,
+              },
+              '.MuiTablePagination-selectLabel, .MuiTablePagination-displayedRows': {
+                fontSize: isMobile ? '0.9rem' : undefined,
+              },
+            }}
           />
         </CardContent>
       </Card>
