@@ -505,6 +505,13 @@ const processTeamCommission = async (user_id, amount) => {
     const maxLevel = 10;
 
     while (currentUser && level <= maxLevel) {
+      // Skip level ROI for direct referrer (who gets referral bonus)
+      if (currentUser._id.toString() === investmentUser.refer_id?.toString()) {
+        log.info(`[LEVEL ROI] Skipping user ${currentUser.username || currentUser.email} (ID: ${currentUser._id}) at level ${level}: Is direct referrer, already gets referral bonus.`);
+        currentUser = await getNextUpline(currentUser);
+        level++;
+        continue;
+      }
       // 1. Must have invested
       const hasInvested = await hasUserInvested(currentUser._id);
       if (!hasInvested) {

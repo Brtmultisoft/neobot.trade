@@ -481,7 +481,7 @@ module.exports = () => {
     Router.get("/get-all-stacked-token", userInvestmentController.getAllStackedToken);
     Router.get("/get-investment/:id", userInvestmentController.getOne);
     Router.get("/get-investment-sum", userInvestmentController.getSum);
-    Router.post("/add-investment", validationMiddleware(investmentValidation.add, 'body'), userInvestmentController.add);
+    Router.post("/add-investment", validationMiddleware(investmentValidation.add, 'body'), userInvestmentController.addTradingPackage);
 
     /**
      * Trading Package Purchase Route (Authentication Required)

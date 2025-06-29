@@ -196,9 +196,20 @@ const BuyPackage = () => {
     try {
       const investmentAmount = parseFloat(amount);
       setError('');
+         console.log(
+          "data",
+          
+          {
+          amount: investmentAmount,
+          package_id: selectedPlan.id,
+          daily_profit: selectedPlan.daily_trading_roi,
+          "selectedPlan":selectedPlan
+        });
+         
+
       await addInvestment({
         amount: investmentAmount,
-        package_id: selectedPlan._id,
+        package_id: selectedPlan.id,
         daily_profit: selectedPlan.daily_trading_roi
       });
     } catch (error) {
