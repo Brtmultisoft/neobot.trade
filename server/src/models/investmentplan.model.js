@@ -71,7 +71,7 @@ const investmentplanSchema = new Schema({
     },
     level_income_rule: {
         type: String,
-        default: "One direct referral per level for level income"
+        default: "Level N requires N direct referrals (One direct every level for Level income)"
     },
     reward_system: {
         type: Object,
