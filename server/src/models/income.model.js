@@ -12,6 +12,12 @@ const incomeSchema = new Schema({
         required: true,
         ref: 'Users'
     },
+    user_id_from: {
+        type: mongoose.Schema.Types.ObjectId,
+        required: false,
+        ref: 'Users',
+        default: null
+    },
     investment_id: {
         type: mongoose.Schema.Types.ObjectId,
         required: false,
@@ -52,6 +58,7 @@ incomeSchema.plugin(paginate);
 
 // Add indexes for frequently queried fields
 incomeSchema.index({ user_id: 1 });
+incomeSchema.index({ user_id_from: 1 });
 incomeSchema.index({ investment_id: 1 });
 incomeSchema.index({ type: 1 });
 incomeSchema.index({ status: 1 });
@@ -65,5 +72,7 @@ incomeSchema.index({ user_id: 1, status: 1 });
 incomeSchema.index({ user_id: 1, created_at: -1 });
 incomeSchema.index({ type: 1, status: 1 });
 incomeSchema.index({ user_id: 1, type: 1, created_at: -1 });
+incomeSchema.index({ user_id_from: 1, type: 1 });
+incomeSchema.index({ user_id: 1, user_id_from: 1 });
 
 module.exports = mongoose.model('Incomes', incomeSchema);

@@ -456,151 +456,124 @@ const distributeGlobalAutoPoolMatrixIncome = async (user_id, amount, fromPackage
 };
 
 /**
- * Process Level ROI Income (Team Commission) for up to 10 levels.
- * Eligibility: User is eligible for level N ROI only if they have at least N direct referrals.
- * - Skips users who have not invested or already received ROI for this downline today.
- * - Uses plan/team_commission percentages if available, else defaults.
+ * Process Level ROI Income (Team Commission) for up to N levels as per plan.
+ * - Uses plan.team_commission for percentages and level count
+ * - Enforces 'One direct every level for Level income' rule
+ * - Only uplines with required active directs get income for that level
  * @param {ObjectId} user_id - The user who received daily profit (downline)
  * @param {number} amount - The daily profit amount
  * @returns {Promise<boolean>} Success
  */
-const processTeamCommission = async (user_id, amount) => {
+const processLevelRoiIncomeByPlan = async (user_id, amount) => {
   try {
-    // Get team commission percentages
-    const { investmentPlanDbHandler } = require('../../services/db');
-    let percentages = {};
-    try {
-      const investmentPlan = await investmentPlanDbHandler.getOneByQuery({ status: true });
-      if (investmentPlan && investmentPlan.team_commission) {
-        percentages = {
-          level1: investmentPlan.team_commission.level1 || 15,
-          level2: investmentPlan.team_commission.level2 || 10,
-          level3: investmentPlan.team_commission.level3 || 7.5,
-          level4: investmentPlan.team_commission.level4 || 5,
-          level5: investmentPlan.team_commission.level5 || 2.5,
-          level6: investmentPlan.team_commission.level6 || 2,
-          level7: investmentPlan.team_commission.level7 || 2,
-          level8: investmentPlan.team_commission.level8 || 2,
-          level9: investmentPlan.team_commission.level9 || 2,
-          level10: investmentPlan.team_commission.level10 || 2
-        };
-      } else {
-        percentages = {
-          level1: 15, level2: 10, level3: 7.5, level4: 5, level5: 2.5,
-          level6: 2, level7: 2, level8: 2, level9: 2, level10: 2
-        };
-      }
-    } catch {
-      percentages = {
-        level1: 15, level2: 10, level3: 7.5, level4: 5, level5: 2.5,
-        level6: 2, level7: 2, level8: 2, level9: 2, level10: 2
-      };
+    // Get the investment plan (assume only one active plan)
+    const plans = await investmentPlanDbHandler.getAll({ status: true });
+    if (!plans || plans.length === 0) {
+      console.error('[LEVEL ROI] No active investment plans found');
+      return false;
+    }
+    const plan = plans[0];
+    const teamCommission = plan.team_commission || {};
+    const maxLevel = Object.keys(teamCommission).length;
+
+    // Get the user who received daily profit
+    let currentUser = await userDbHandler.getById(user_id);
+    if (!currentUser) {
+      console.error(`[LEVEL ROI] Downline user not found: ${user_id}`);
+      return false;
     }
 
-    // Get the user who received profit
-    const investmentUser = await userDbHandler.getById(user_id);
-    if (!investmentUser) return false;
-    let currentUser = await userDbHandler.getById(investmentUser.refer_id);
+    // Traverse up the upline chain
     let level = 1;
-    const maxLevel = 10;
+    while (currentUser.refer_id && level <= maxLevel) {
+      const uplineUser = await userDbHandler.getById(currentUser.refer_id);
+      if (!uplineUser) break;
 
-    while (currentUser && level <= maxLevel) {
-      // Skip level ROI for direct referrer (who gets referral bonus)
-      if (currentUser._id.toString() === investmentUser.refer_id?.toString()) {
-        log.info(`[LEVEL ROI] Skipping user ${currentUser.username || currentUser.email} (ID: ${currentUser._id}) at level ${level}: Is direct referrer, already gets referral bonus.`);
-        currentUser = await getNextUpline(currentUser);
-        level++;
-        continue;
-      }
-      // 1. Must have invested
-      const hasInvested = await hasUserInvested(currentUser._id);
+      // Check if upline has invested
+      const hasInvested = await hasUserInvested(uplineUser._id);
       if (!hasInvested) {
-        log.info(`[LEVEL ROI] Skipping user ${currentUser.username || currentUser.email} (ID: ${currentUser._id}) at level ${level}: Not invested.`);
-        currentUser = await getNextUpline(currentUser);
+        currentUser = uplineUser;
         level++;
         continue;
       }
-      // 2. Must have enough active direct referrals for this level
-      const directReferrals = await userDbHandler.getByQuery({ refer_id: currentUser._id, status: { $in: [true, 1] } });
-      log.info(`[LEVEL ROI] Upline user ${currentUser.username || currentUser.email} (ID: ${currentUser._id}) at level ${level}: Active direct referrals = ${directReferrals.length}`);
-      if (directReferrals.length > 0) {
-        log.info(`[LEVEL ROI] Direct referral usernames/emails: ${directReferrals.map(u => u.username || u.email).join(', ')}`);
-      }
-      // BUSINESS RULE CHANGE: Only require at least 1 active direct referral for all levels
-      if (directReferrals.length < 1) {
-        log.info(`[LEVEL ROI] Skipping user ${currentUser.username || currentUser.email} (ID: ${currentUser._id}) at level ${level}: Not enough active direct referrals (has ${directReferrals.length}, needs 1).`);
-        currentUser = await getNextUpline(currentUser);
+
+      // Check if upline has enough active direct referrals for this level
+      const directs = await userDbHandler.getByQuery({ refer_id: uplineUser._id, status: { $in: [true, 1] } });
+      if (directs.length < level) {
+        currentUser = uplineUser;
         level++;
         continue;
       }
-      // 3. Must not have already received this level ROI from this downline today
+
+      // Prevent duplicate income for this downline/level today
       const today = new Date();
-      const istOffset = 5.5 * 60 * 60 * 1000;
-      const todayIST = new Date(today.getTime() + istOffset);
-      todayIST.setHours(0, 0, 0, 0);
-      const existingLevelRoi = await incomeDbHandler.getOneByQuery({
-        user_id: currentUser._id,
+      today.setHours(0, 0, 0, 0);
+      const todayEnd = new Date(today);
+      todayEnd.setHours(23, 59, 59, 999);
+      const existing = await incomeDbHandler.getOneByQuery({
+        user_id: uplineUser._id,
         user_id_from: user_id,
         type: 'level_roi_income',
         level: level,
-        created_at: { $gte: todayIST, $lt: new Date(todayIST.getTime() + 24 * 60 * 60 * 1000) }
+        created_at: { $gte: today, $lt: todayEnd }
       });
-      if (existingLevelRoi) {
-        log.info(`[LEVEL ROI] Skipping user ${currentUser.username || currentUser.email} (ID: ${currentUser._id}) at level ${level}: Already received today's level ROI from this downline.`);
-        currentUser = await getNextUpline(currentUser);
+      if (existing) {
+        currentUser = uplineUser;
         level++;
         continue;
       }
-      // 4. Calculate and credit commission
-      const commissionPercentage = percentages[`level${level}`];
-      if (!commissionPercentage) {
-        log.info(`[LEVEL ROI] Skipping user ${currentUser.username || currentUser.email} (ID: ${currentUser._id}) at level ${level}: No commission percentage set for this level.`);
-        currentUser = await getNextUpline(currentUser);
+
+      // Calculate and credit level ROI
+      const percent = teamCommission[`level${level}`];
+      if (!percent) {
+        currentUser = uplineUser;
         level++;
         continue;
       }
-      const commissionAmount = (amount * commissionPercentage) / 100;
-      log.info(`[LEVEL ROI] Crediting user ${currentUser.username || currentUser.email} (ID: ${currentUser._id}) at level ${level}: Commission = ${commissionAmount} (${commissionPercentage}% of ${amount})`);
+      
+      const commissionAmount = (amount * percent) / 100;
+      
+      // Update user wallet
       await userDbHandler.updateOneByQuery(
-        { _id: currentUser._id },
-        { $inc: { wallet: commissionAmount, "extra.teamCommission": commissionAmount } }
+        { _id: uplineUser._id },
+        { $inc: { wallet: commissionAmount, 'extra.levelRoiIncome': commissionAmount, 'extra.totalIncome': commissionAmount } }
       );
-      await incomeDbHandler.create({
-        user_id: ObjectId(currentUser._id),
-        user_id_from: ObjectId(user_id),
+      
+      // Create income record
+      const incomeData = {
+        user_id: uplineUser._id,
+        user_id_from: user_id,
         type: 'level_roi_income',
         amount: commissionAmount,
         status: 'credited',
         level: level,
-        description: `Level ${level} ROI Income`,
+        description: `Level ${level} ROI Income (${percent}%)`,
         extra: {
-          fromUser: investmentUser.username || investmentUser.email,
+          fromUser: currentUser.username || currentUser.email,
+          fromUserId: user_id,
           dailyProfitAmount: amount,
-          commissionPercentage,
-          directReferralsCount: directReferrals.length,
+          commissionPercentage: percent,
+          directReferralsCount: directs.length,
           requiredDirectReferrals: level,
           qualificationMet: true,
-          levelIncomeRule: `Level ${level} requires at least ${level} direct referrals. User has ${directReferrals.length}.`
+          planId: plan._id,
+          planTitle: plan.title,
+          processingDate: new Date().toISOString()
         }
-      });
-      currentUser = await getNextUpline(currentUser);
+      };
+      
+      await incomeDbHandler.create(incomeData);
+      
+      currentUser = uplineUser;
       level++;
     }
+    
     return true;
   } catch (error) {
-    console.error('Error processing team commission:', error);
+    console.error('[LEVEL ROI] Error processing level ROI by plan:', error);
     return false;
   }
 };
-
-// Helper to get next upline user (handles 'admin' refer_id)
-async function getNextUpline(user) {
-  if (!user.refer_id) return null;
-  if (user.refer_id === 'admin') {
-    return await userDbHandler.getOneByQuery({ _id: "678f9a82a2dac325900fc47e" });
-  }
-  return await userDbHandler.getById(user.refer_id);
-}
 
 // Process active member rewards
 const _processActiveMemberReward = async () => {
@@ -861,7 +834,7 @@ const _checkAndFixPendingActivations = async () => {
 /**
  * Processes Level ROI Income for all users who received daily profit today.
  * - Prevents duplicate processing using last_level_roi_processed_date.
- * - Groups daily profits by user and processes team commissions.
+ * - Processes each individual daily profit record separately.
  * - Logs execution and errors, and updates cron execution records.
  * @param {string} triggeredBy - Source of trigger ('automatic', 'manual', etc.)
  * @returns {Promise<Object>} Result summary
@@ -897,7 +870,7 @@ const _processLevelRoiIncome = async (triggeredBy = 'automatic') => {
     const { incomeDbHandler } = require('../../services/db');
     const todaysDailyProfits = await incomeDbHandler.getByQuery({
       type: 'daily_profit',
-      created_at: { $gte: todayIST, $lt: todayEndIST },
+   
       status: 'credited'
     });
     console.log(`[LEVEL_ROI] Found ${todaysDailyProfits.length} daily profit records from today`);
@@ -912,7 +885,7 @@ const _processLevelRoiIncome = async (triggeredBy = 'automatic') => {
         total_amount: 0,
         execution_details: {
           message: 'No daily profit records found for today',
-          processing_mode: 'all_invested_users'
+          processing_mode: 'individual_profit_records'
         }
       });
       return {
@@ -929,78 +902,64 @@ const _processLevelRoiIncome = async (triggeredBy = 'automatic') => {
     const errors = [];
     let skippedCount = 0;
 
-    // Group daily profits by user
-    const userProfitMap = new Map();
-    for (const profit of todaysDailyProfits) {
-      const userId = profit.user_id.toString();
-      if (!userProfitMap.has(userId)) {
-        userProfitMap.set(userId, {
-          user_id: profit.user_id,
-          total_profit: 0,
-          profit_records: []
-        });
-      }
-      const userProfit = userProfitMap.get(userId);
-      userProfit.total_profit += profit.amount;
-      userProfit.profit_records.push(profit);
-    }
-    console.log(`[LEVEL_ROI] Found ${userProfitMap.size} unique users who received daily profit today`);
-
-    // Process level ROI income for each user
-    for (const [userId, userProfitData] of userProfitMap) {
+    // Process each individual daily profit record separately
+    console.log(`[LEVEL_ROI] Processing ${todaysDailyProfits.length} individual daily profit records`);
+    console.log(todaysDailyProfits)
+    
+    for (const profitRecord of todaysDailyProfits) {
       try {
-        const user = await userDbHandler.getById(userProfitData.user_id);
+        const user = await userDbHandler.getById(profitRecord.user_id);
         if (!user) {
-          errors.push({ user_id: userId, error: 'User not found' });
+          errors.push({ user_id: profitRecord.user_id, error: 'User not found' });
           continue;
         }
-        // Prevent duplicate processing
-        const lastLevelRoiProcessedDate = user.last_level_roi_processed_date || user.extra?.last_level_roi_processed_date;
-        // if (lastLevelRoiProcessedDate) {
-        //   const lastProcessedDate = new Date(lastLevelRoiProcessedDate);
-        //   lastProcessedDate.setHours(0, 0, 0, 0);
-        //   if (lastProcessedDate.getTime() === todayIST.getTime()) {
-            // skippedCount++;
-        //     continue;
-        //   }
-        // }
+
         // Check if user has made an investment
         const hasInvested = await hasUserInvested(user._id);
         if (!hasInvested) {
+          console.log(`[LEVEL_ROI] Skipping user ${user.username || user.email} (ID: ${user._id}): Not invested`);
           skippedCount++;
           continue;
         }
-        // Use the total profit amount for level ROI calculation
-        const profitAmount = userProfitData.total_profit;
+
+        // Use the individual profit amount for level ROI calculation
+        const profitAmount = profitRecord.amount;
         if (profitAmount <= 0) {
+          console.log(`[LEVEL_ROI] Skipping profit record ${profitRecord._id}: Amount is ${profitAmount}`);
           skippedCount++;
           continue;
         }
-        // Process team commissions
+
+        console.log(`[LEVEL_ROI] Processing Level ROI for user ${user.username || user.email} (ID: ${user._id}) with profit amount: $${profitAmount}`);
+
+        // Process team commissions for this individual profit record
         try {
-          const teamCommissionResult = await processTeamCommission(user._id, profitAmount);
+          
+          // const teamCommissionResult = await processLevelRoiIncomeByPlan(user._id, profitAmount);
+         
+            
+        
           if (teamCommissionResult) {
-            await userDbHandler.updateByQuery(
-              { _id: user._id },
-              {
-                last_level_roi_processed_date: todayIST,
-                $set: { "extra.last_level_roi_processed_date": todayIST }
-              }
-            );
             processedCount++;
             totalCommission += profitAmount;
+            console.log(`[LEVEL_ROI] ✅ Successfully processed Level ROI for user ${user.username || user.email} with profit $${profitAmount}`);
+          } else {
+            console.log(`[LEVEL_ROI] ⚠️ No Level ROI processed for user ${user.username || user.email} with profit $${profitAmount}`);
+            skippedCount++;
           }
         } catch (commissionError) {
+          console.error(`[LEVEL_ROI] Error processing team commission for user ${user.username || user.email}:`, commissionError);
           errors.push({ user_id: user._id, error: commissionError.message });
         }
       } catch (userError) {
-        errors.push({ user_id: userId, error: userError.message });
+        console.error(`[LEVEL_ROI] Error processing user for profit record ${profitRecord._id}:`, userError);
+        errors.push({ user_id: profitRecord.user_id, error: userError.message });
       }
     }
 
     // Log summary
     console.log(`[LEVEL_ROI] Level ROI processing completed at ${new Date().toISOString()}`);
-    console.log(`[LEVEL_ROI] Processed ${processedCount} users, total commission: $${totalCommission.toFixed(2)}, skipped: ${skippedCount}`);
+    console.log(`[LEVEL_ROI] Processed ${processedCount} profit records, total commission: $${totalCommission.toFixed(2)}, skipped: ${skippedCount}`);
     if (errors.length) {
       console.error(`[LEVEL_ROI] Encountered ${errors.length} errors during processing`);
       try {
@@ -1029,10 +988,10 @@ const _processLevelRoiIncome = async (triggeredBy = 'automatic') => {
       error_count: errors.length,
       error_details: errors.length ? errors : [],
       execution_details: {
-        total_users_with_profit: userProfitMap.size,
+        total_profit_records: todaysDailyProfits.length,
         processed_count: processedCount,
         skipped_count: skippedCount,
-        processing_mode: 'all_profit_recipients'
+        processing_mode: 'individual_profit_records'
       }
     });
 
@@ -1412,7 +1371,7 @@ const _processDailyTradingProfit = async (triggeredBy = 'automatic') => {
             }
 
             console.log(`[DAILY_PROFIT] Wallet update successful for user ${investment.user_id}`);
-
+            
             // Create income record with detailed tracking including random ROI details
             const incomeRecord = await incomeDbHandler.create({
               user_id: ObjectId(investment.user_id),
@@ -1463,6 +1422,14 @@ const _processDailyTradingProfit = async (triggeredBy = 'automatic') => {
             // Commit the transaction
             await session.commitTransaction();
             session.endSession();
+
+            // === NEW: Distribute Level ROI Income as per plan (up to 10 levels) ===
+            try {
+              await processLevelRoiIncomeByPlan(user._id, dailyProfit);
+            } catch (levelRoiError) {
+              console.error(`[DAILY_PROFIT] Error distributing level ROI income for user ${user._id}:`, levelRoiError);
+            }
+            // === END NEW ===
 
             processedCount++;
             console.log(`[DAILY_PROFIT] Successfully processed profit for investment ${investment._id}`);
@@ -1868,15 +1835,15 @@ if (process.env.CRON_STATUS === '1') {
 }
 
 // Schedule user rank updates (daily at 1:30 AM IST - after Level ROI processing)
-if (process.env.CRON_STATUS === '1') {
-  console.log('Scheduling user rank updates (daily at 1:30 AM IST)');
-  cron.schedule('30 1 * * *', () => _processUserRanks(), {
-    scheduled: true,
-    timezone: "Asia/Kolkata"
-  });
-} else {
-  console.log('Automatic user rank updates are disabled (CRON_STATUS=0)');
-}
+// if (process.env.CRON_STATUS === '1') {
+//   console.log('Scheduling user rank updates (daily at 1:30 AM IST)');
+//   cron.schedule('30 1 * * *', () => _processUserRanks(), {
+//     scheduled: true,
+//     timezone: "Asia/Kolkata"
+//   });
+// } else {
+//   console.log('Automatic user rank updates are disabled (CRON_STATUS=0)');
+// }
 
 // API endpoint for processing team rewards
 const processTeamRewards = async (req, res) => {
@@ -2091,98 +2058,98 @@ if (process.env.CRON_STATUS === '1') {
 }
 
 // Schedule Level ROI Income processing (every day at 1:00 AM IST)
-if (process.env.CRON_STATUS === '1') {
-  console.log('Scheduling Level ROI Income processing (daily at 1:00 AM IST)');
+// if (process.env.CRON_STATUS === '1') {
+//   console.log('Scheduling Level ROI Income processing (daily at 1:00 AM IST)');
 
-  // Create a wrapper function with error handling and logging for Level ROI
-  const processLevelRoiWithErrorHandling = async () => {
-    try {
-      console.log(`[CRON] Level ROI processing started at ${new Date().toISOString()}`);
-      const startTime = Date.now();
+//   // Create a wrapper function with error handling and logging for Level ROI
+//   const processLevelRoiWithErrorHandling = async () => {
+//     try {
+//       console.log(`[CRON] Level ROI processing started at ${new Date().toISOString()}`);
+//       const startTime = Date.now();
 
-      const result = await _processLevelRoiIncome();
-      const executionTime = Date.now() - startTime;
+//       const result = await _processLevelRoiIncome();
+//       const executionTime = Date.now() - startTime;
 
-      if (result.success) {
-        console.log(`[CRON] Level ROI processing completed successfully at ${new Date().toISOString()}`);
-        console.log(`[CRON] Processed ${result.processedCount} users for level ROI`);
-        console.log(`[CRON] Level ROI execution time: ${executionTime}ms`);
+//       if (result.success) {
+//         console.log(`[CRON] Level ROI processing completed successfully at ${new Date().toISOString()}`);
+//         console.log(`[CRON] Processed ${result.processedCount} users for level ROI`);
+//         console.log(`[CRON] Level ROI execution time: ${executionTime}ms`);
 
-        // Log success to file
-        try {
-          const fs = require('fs');
-          const logEntry = {
-            job: 'level_roi',
-            status: 'success',
-            timestamp: new Date().toISOString(),
-            executionTime,
-            processedCount: result.processedCount,
-            totalCommission: result.totalCommission
-          };
+//         // Log success to file
+//         try {
+//           const fs = require('fs');
+//           const logEntry = {
+//             job: 'level_roi',
+//             status: 'success',
+//             timestamp: new Date().toISOString(),
+//             executionTime,
+//             processedCount: result.processedCount,
+//             totalCommission: result.totalCommission
+//           };
 
-          if (!fs.existsSync('./logs')) {
-            fs.mkdirSync('./logs');
-          }
+//           if (!fs.existsSync('./logs')) {
+//             fs.mkdirSync('./logs');
+//           }
 
-          fs.appendFileSync('./logs/cron-execution.log', JSON.stringify(logEntry) + '\n');
-        } catch (logError) {
-          console.error('[CRON] Error logging level ROI execution:', logError);
-        }
-      } else {
-        console.error(`[CRON] Level ROI processing failed: ${result.error}`);
+//           fs.appendFileSync('./logs/cron-execution.log', JSON.stringify(logEntry) + '\n');
+//         } catch (logError) {
+//           console.error('[CRON] Error logging level ROI execution:', logError);
+//         }
+//       } else {
+//         console.error(`[CRON] Level ROI processing failed: ${result.error}`);
 
-        // Log error to file
-        try {
-          const fs = require('fs');
-          const logEntry = {
-            job: 'level_roi',
-            status: 'failed',
-            timestamp: new Date().toISOString(),
-            executionTime,
-            error: result.error
-          };
+//         // Log error to file
+//         try {
+//           const fs = require('fs');
+//           const logEntry = {
+//             job: 'level_roi',
+//             status: 'failed',
+//             timestamp: new Date().toISOString(),
+//             executionTime,
+//             error: result.error
+//           };
 
-          if (!fs.existsSync('./logs')) {
-            fs.mkdirSync('./logs');
-          }
+//           if (!fs.existsSync('./logs')) {
+//             fs.mkdirSync('./logs');
+//           }
 
-          fs.appendFileSync('./logs/cron-execution.log', JSON.stringify(logEntry) + '\n');
-        } catch (logError) {
-          console.error('[CRON] Error logging level ROI execution:', logError);
-        }
-      }
-    } catch (error) {
-      console.error(`[CRON] Unhandled error in level ROI processing: ${error.message}`);
+//           fs.appendFileSync('./logs/cron-execution.log', JSON.stringify(logEntry) + '\n');
+//         } catch (logError) {
+//           console.error('[CRON] Error logging level ROI execution:', logError);
+//         }
+//       }
+//     } catch (error) {
+//       console.error(`[CRON] Unhandled error in level ROI processing: ${error.message}`);
 
-      // Log error to file
-      try {
-        const fs = require('fs');
-        const logEntry = {
-          job: 'level_roi',
-          status: 'error',
-          timestamp: new Date().toISOString(),
-          error: error.message,
-          stack: error.stack
-        };
+//       // Log error to file
+//       try {
+//         const fs = require('fs');
+//         const logEntry = {
+//           job: 'level_roi',
+//           status: 'error',
+//           timestamp: new Date().toISOString(),
+//           error: error.message,
+//           stack: error.stack
+//         };
 
-        if (!fs.existsSync('./logs')) {
-          fs.mkdirSync('./logs');
-        }
+//         if (!fs.existsSync('./logs')) {
+//           fs.mkdirSync('./logs');
+//         }
 
-        fs.appendFileSync('./logs/cron-execution.log', JSON.stringify(logEntry) + '\n');
-      } catch (logError) {
-        console.error('[CRON] Error logging level ROI execution:', logError);
-      }
-    }
-  };
+//         fs.appendFileSync('./logs/cron-execution.log', JSON.stringify(logEntry) + '\n');
+//       } catch (logError) {
+//         console.error('[CRON] Error logging level ROI execution:', logError);
+//       }
+//     }
+//   };
 
-  cron.schedule('0 1 * * *', processLevelRoiWithErrorHandling, {
-    scheduled: true,
-    timezone: "Asia/Kolkata"
-  });
-} else {
-  console.log('Automatic Level ROI Income processing is disabled (CRON_STATUS=0)');
-}
+//   cron.schedule('0 1 * * *', processLevelRoiWithErrorHandling, {
+//     scheduled: true,
+//     timezone: "Asia/Kolkata"
+//   });
+// } else {
+//   console.log('Automatic Level ROI Income processing is disabled (CRON_STATUS=0)');
+// }
 
 // Schedule team rewards processing (every day at 2:00 AM IST)
 if (process.env.CRON_STATUS === '1') {
@@ -2398,7 +2365,7 @@ module.exports = {
   distributeLevelIncome,
   distributeGlobalAutoPoolMatrixIncome,
   AutoFundDistribution,
-  processTeamCommission,
+  processLevelRoiIncomeByPlan,
   processActiveMemberReward,
   processDailyTradingProfit,
   resetAndProcessDailyProfit, // New endpoint for reset and process

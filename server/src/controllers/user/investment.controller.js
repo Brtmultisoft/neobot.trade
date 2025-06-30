@@ -279,40 +279,25 @@ module.exports = {
             // Process referral bonus if user has a referrer
             try {
                 // --- REFERRAL BONUS LOGIC ---
-                // Referrer ko har naye referred user par ek hi baar bonus milega
+                // Referrer ko har investment par bonus milega (not just once per referred user)
                 console.log('[REFERRAL BONUS] user.refer_id:', user.refer_id);
                 if (user.refer_id) {
-                    const referrer = await userDbHandler.getById(user.refer_id);
-                    console.log('[REFERRAL BONUS] referrer:', referrer ? referrer.username || referrer.email : null);
-                    if (referrer) {
-                        // Check if referral bonus has already been given from this user to this referrer
-                        const existingReferralBonus = await incomeDbHandler.getOneByQuery({
-                            user_id: ObjectId(referrer._id), // Referrer
-                            user_id_from: ObjectId(user_id),  // Referred user
-                            type: 'referral_bonus'
-                        });
-                        console.log('[REFERRAL BONUS] existingReferralBonus:', existingReferralBonus);
-                        if (!existingReferralBonus) {
+                    // Check if referrer already got referral bonus from this user
+                    const existingReferralBonus = await incomeDbHandler.getByQuery({
+                        user_id: user.refer_id,
+                        user_id_from: user_id,
+                        type: 'referral_bonus'
+                    });
+                    if (existingReferralBonus && existingReferralBonus.length > 0) {
+                        console.log('[REFERRAL BONUS] Referrer already received referral bonus from this user. Skipping bonus.');
+                    } else {
+                        const referrer = await userDbHandler.getById(user.refer_id);
+                        console.log('[REFERRAL BONUS] referrer:', referrer ? referrer.username || referrer.email : null);
+                        if (referrer) {
                             // Calculate referral bonus - 10% of investment amount
                             const referralBonusRate = 10;
                             const referralBonus = (amount * referralBonusRate) / 100;
                             console.log(`[REFERRAL BONUS] Crediting referral bonus of ${referralBonus} to referrer ${referrer.username || referrer.email}`);
-                            // Create referral bonus income record
-                            await incomeDbHandler.create({
-                                user_id: ObjectId(referrer._id),
-                                user_id_from: ObjectId(user_id),
-                                type: 'referral_bonus',
-                                amount: referralBonus,
-                                status: 'credited',
-                                description: 'Direct Referral Commission',
-                                extra: {
-                                    referralAmount: amount,
-                                    commissionRate: referralBonusRate,
-                                    fromUser: user_id,
-                                    timestamp: new Date().toISOString(),
-                                    isFirstReferralBonus: true
-                                }
-                            });
                             // Add bonus to referrer's wallet and update directIncome tracking
                             if (!referrer.extra) {
                                 await userDbHandler.updateOneByQuery(
@@ -330,11 +315,10 @@ module.exports = {
                                     }
                                 }
                             );
+                            console.log(`[REFERRAL BONUS] ✅ Successfully credited ${referralBonus} to referrer ${referrer.username || referrer.email} for investment of ${amount}`);
                         } else {
-                            console.log(`[REFERRAL BONUS] Bonus already given to referrer ${referrer.username || referrer.email} for user ${user.username || user.email}`);
+                            console.log('[REFERRAL BONUS] No referrer found for user:', user.username || user.email);
                         }
-                    } else {
-                        console.log('[REFERRAL BONUS] No referrer found for user:', user.username || user.email);
                     }
                 } else {
                     console.log('[REFERRAL BONUS] No refer_id for user:', user.username || user.email);
@@ -349,6 +333,47 @@ module.exports = {
             console.log('Investment created:', investment ? 'Success' : 'Failed');
             if (investment) {
                 console.log('Investment ID:', investment._id);
+            }
+
+            // Create referral bonus income record after investment is created
+            if (user.refer_id && investment) {
+                try {
+                    // Check if referrer already got referral bonus from this user
+                    const existingReferralBonus = await incomeDbHandler.getByQuery({
+                        user_id: user.refer_id,
+                        user_id_from: user_id,
+                        type: 'referral_bonus'
+                    });
+                    if (!existingReferralBonus || existingReferralBonus.length === 0) {
+                        const referrer = await userDbHandler.getById(user.refer_id);
+                        if (referrer) {
+                            const referralBonusRate = 10;
+                            const referralBonus = (amount * referralBonusRate) / 100;
+                            // Create referral bonus income record with investment_id
+                            await incomeDbHandler.create({
+                                user_id: ObjectId(referrer._id),
+                                user_id_from: ObjectId(user_id),
+                                investment_id: investment._id, // Include investment_id to make it unique per investment
+                                type: 'referral_bonus',
+                                amount: referralBonus,
+                                status: 'credited',
+                                description: 'Direct Referral Commission',
+                                extra: {
+                                    referralAmount: amount,
+                                    commissionRate: referralBonusRate,
+                                    fromUser: user_id,
+                                    timestamp: new Date().toISOString(),
+                                    isInvestmentReferralBonus: true
+                                }
+                            });
+                            console.log(`[REFERRAL BONUS] ✅ Income record created for investment ${investment._id}`);
+                        }
+                    } else {
+                        console.log('[REFERRAL BONUS] Income record already exists for this referrer and user. Skipping.');
+                    }
+                } catch (incomeError) {
+                    console.error('Error creating referral bonus income record:', incomeError);
+                }
             }
 
             // Update user's wallet_topup and total investment
@@ -590,102 +615,100 @@ add: async (req, res) => {
         if (user.refer_id) {
             console.log('=== PROCESSING REFERRAL BONUS ===');
             console.log('User has referrer ID:', user.refer_id);
-            
             try {
-                const referrer = await userDbHandler.getById(user.refer_id);
-                console.log('Referrer lookup result:', referrer ? 'Found' : 'Not found');
-                
-                if (referrer) {
-                    console.log('Referrer details:', {
-                        id: referrer._id,
-                        name: referrer.name || referrer.username,
-                        current_wallet: referrer.wallet,
-                        current_extra: referrer.extra
-                    });
-
-                    // Calculate 10% referral bonus
-                    const referralBonus = Math.round((amount * 0.10) * 100) / 100; // Round to 2 decimal places
-                    console.log(`Calculating referral bonus: ${amount} * 0.10 = ${referralBonus}`);
-
-                    // Step 1: Create income record
-                    console.log('Creating referral income record...');
-                    const incomeRecord = await incomeDbHandler.create({
-                        user_id: referrer._id, // Make sure this is the correct format your DB expects
-                        user_id_from: user_id,
-                        investment_id: null, // Will update later
-                        type: 'referral_bonus',
-                        amount: referralBonus,
-                        status: 'credited',
-                        description: `Referral Commission - 10% of ${amount} investment`,
-                        created_at: new Date(),
-                        extra: {
-                            referralAmount: amount,
-                            bonusPercentage: 10,
-                            fromUser: user_id,
-                            fromUserName: user.name || user.username || 'Unknown',
-                            timestamp: new Date().toISOString(),
-                            packageId: package_id,
-                            dailyProfit: daily_profit
+                // Check if referrer already got referral bonus from this user
+                const existingReferralBonus = await incomeDbHandler.getByQuery({
+                    user_id: user.refer_id,
+                    user_id_from: user_id,
+                    type: 'referral_bonus'
+                });
+                if (existingReferralBonus && existingReferralBonus.length > 0) {
+                    console.log('Referrer already received referral bonus from this user. Skipping bonus.');
+                } else {
+                    const referrer = await userDbHandler.getById(user.refer_id);
+                    console.log('Referrer lookup result:', referrer ? 'Found' : 'Not found');
+                    if (referrer) {
+                        console.log('Referrer details:', {
+                            id: referrer._id,
+                            name: referrer.name || referrer.username,
+                            current_wallet: referrer.wallet,
+                            current_extra: referrer.extra
+                        });
+                        // Calculate 10% referral bonus
+                        const referralBonus = Math.round((amount * 0.10) * 100) / 100; // Round to 2 decimal places
+                        console.log(`Calculating referral bonus: ${amount} * 0.10 = ${referralBonus}`);
+                        // Step 1: Create income record
+                        console.log('Creating referral income record...');
+                        const incomeRecord = await incomeDbHandler.create({
+                            user_id: referrer._id, // Make sure this is the correct format your DB expects
+                            user_id_from: user_id,
+                            investment_id: null, // Will update later
+                            type: 'referral_bonus',
+                            amount: referralBonus,
+                            status: 'credited',
+                            description: `Referral Commission - 10% of ${amount} investment`,
+                            created_at: new Date(),
+                            extra: {
+                                referralAmount: amount,
+                                bonusPercentage: 10,
+                                fromUser: user_id,
+                                fromUserName: user.name || user.username || 'Unknown',
+                                timestamp: new Date().toISOString(),
+                                packageId: package_id,
+                                dailyProfit: daily_profit
+                            }
+                        });
+                        console.log('Income record creation result:', incomeRecord ? 'SUCCESS' : 'FAILED');
+                        if (incomeRecord) {
+                            console.log('Income record ID:', incomeRecord._id);
                         }
-                    });
-
-                    console.log('Income record creation result:', incomeRecord ? 'SUCCESS' : 'FAILED');
-                    if (incomeRecord) {
-                        console.log('Income record ID:', incomeRecord._id);
-                    }
-
-                    // Step 2: Initialize extra field if needed
-                    console.log('Checking referrer extra field...');
-                    if (!referrer.extra) {
-                        console.log('Initializing extra field for referrer...');
-                        await userDbHandler.updateOneByQuery(
-                            { _id: referrer._id },
-                            { 
-                                $set: { 
-                                    extra: { 
-                                        directIncome: 0, 
-                                        totalIncome: 0 
+                        // Step 2: Initialize extra field if needed
+                        console.log('Checking referrer extra field...');
+                        if (!referrer.extra) {
+                            console.log('Initializing extra field for referrer...');
+                            await userDbHandler.updateOneByQuery(
+                                { _id: referrer._id },
+                                { 
+                                    $set: { 
+                                        extra: { 
+                                            directIncome: 0, 
+                                            totalIncome: 0 
+                                        } 
                                     } 
-                                } 
+                                }
+                            );
+                            console.log('Extra field initialized');
+                        }
+                        // Step 3: Update referrer wallet
+                        console.log('Updating referrer wallet...');
+                        console.log('Before update - Referrer wallet:', referrer.wallet);
+                        const walletUpdateResult = await userDbHandler.updateOneByQuery(
+                            { _id: referrer._id },
+                            {
+                                $inc: {
+                                    wallet: referralBonus,
+                                    "extra.directIncome": referralBonus,
+                                    "extra.totalIncome": referralBonus
+                                }
                             }
                         );
-                        console.log('Extra field initialized');
-                    }
-
-                    // Step 3: Update referrer wallet
-                    console.log('Updating referrer wallet...');
-                    console.log('Before update - Referrer wallet:', referrer.wallet);
-                    
-                    const walletUpdateResult = await userDbHandler.updateOneByQuery(
-                        { _id: referrer._id },
-                        {
-                            $inc: {
-                                wallet: referralBonus,
-                                "extra.directIncome": referralBonus,
-                                "extra.totalIncome": referralBonus
-                            }
+                        console.log('Wallet update result:', walletUpdateResult);
+                        console.log('Update acknowledged:', walletUpdateResult?.acknowledged);
+                        console.log('Modified count:', walletUpdateResult?.modifiedCount);
+                        // Step 4: Verify the update
+                        const updatedReferrer = await userDbHandler.getById(referrer._id);
+                        console.log('After update - Referrer wallet:', updatedReferrer.wallet);
+                        console.log('After update - Direct income:', updatedReferrer.extra?.directIncome);
+                        if (updatedReferrer.wallet > referrer.wallet) {
+                            console.log('✅ REFERRAL BONUS SUCCESSFULLY ADDED!');
+                            console.log(`✅ Referrer ${referrer._id} received ${referralBonus} for investment of ${amount}`);
+                            referralBonusGiven = true;
+                        } else {
+                            console.log('❌ REFERRAL BONUS FAILED - Wallet not updated');
                         }
-                    );
-
-                    console.log('Wallet update result:', walletUpdateResult);
-                    console.log('Update acknowledged:', walletUpdateResult?.acknowledged);
-                    console.log('Modified count:', walletUpdateResult?.modifiedCount);
-
-                    // Step 4: Verify the update
-                    const updatedReferrer = await userDbHandler.getById(referrer._id);
-                    console.log('After update - Referrer wallet:', updatedReferrer.wallet);
-                    console.log('After update - Direct income:', updatedReferrer.extra?.directIncome);
-
-                    if (updatedReferrer.wallet > referrer.wallet) {
-                        console.log('✅ REFERRAL BONUS SUCCESSFULLY ADDED!');
-                        console.log(`✅ Referrer ${referrer._id} received ${referralBonus} for investment of ${amount}`);
-                        referralBonusGiven = true;
                     } else {
-                        console.log('❌ REFERRAL BONUS FAILED - Wallet not updated');
+                        console.log('❌ Referrer not found in database');
                     }
-
-                } else {
-                    console.log('❌ Referrer not found in database');
                 }
             } catch (referralError) {
                 console.error('❌ ERROR in referral bonus processing:', referralError);
