@@ -41,8 +41,10 @@ import AuthService from '../../services/auth.service';
 import OTPInput from '../../components/auth/OTPInput';
 import DualOTPVerificationModal from '../../components/auth/DualOTPVerificationModal';
 import { isValidEmail, isValidPhone, validatePassword } from '../../utils/validators';
+import useTawkTo from '../../hooks/useTawkTo';
 
 const Register = () => {
+  useTawkTo();
   const theme = useTheme();
   const navigate = useNavigate();
   const { loading, error, checkReferralId } = useAuth();

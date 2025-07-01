@@ -24,6 +24,7 @@ import {
 } from '@mui/icons-material';
 import useAuth from '../../hooks/useAuth';
 import useForm from '../../hooks/useForm';
+import useTawkTo from '../../hooks/useTawkTo';
 
 import OTPInput from '../../components/auth/OTPInput';
 import AuthService from '../../services/auth.service';
@@ -65,6 +66,7 @@ export const clearFrontendSession = () => {
 };
 
 const Login = () => {
+  useTawkTo();
   const navigate = useNavigate();
   const location = useLocation(); // Needed for logging and prefill data
   const { login: authLogin, complete2FALogin, loading, error, isAuthenticated } = useAuth();
