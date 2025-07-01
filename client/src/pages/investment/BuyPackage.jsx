@@ -813,10 +813,12 @@ const BuyPackage = () => {
                               border: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`,
                             }}>
                               <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', color: plan.name?.toLowerCase().includes('gold') || plan.name?.toLowerCase().includes('silver') ? '#222' : undefined }}>
-                                $100 →
+                                {plan.name?.toLowerCase().includes('gold') ? '$5000 →' : '$100 →'}
                               </Typography>
                               <Typography variant="body2" fontWeight="bold" sx={{ color: plan.name?.toLowerCase().includes('gold') || plan.name?.toLowerCase().includes('silver') ? '#222' : '#0ECB81', fontSize: '0.8rem' }}>
-                                ${(100 * (plan.daily_trading_roi / 100)).toFixed(2)}/day
+                                {plan.name?.toLowerCase().includes('gold')
+                                  ? `$${(5000 * (plan.daily_trading_roi / 100)).toFixed(2)}/day`
+                                  : `$${(100 * (plan.daily_trading_roi / 100)).toFixed(2)}/day`}
                               </Typography>
                             </Box>
                           </Grid>
@@ -829,10 +831,12 @@ const BuyPackage = () => {
                               border: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`,
                             }}>
                               <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', color: plan.name?.toLowerCase().includes('gold') || plan.name?.toLowerCase().includes('silver') ? '#222' : undefined }}>
-                                $1000 →
+                                {plan.name?.toLowerCase().includes('gold') ? '$10000 →' : '$1000 →'}
                               </Typography>
                               <Typography variant="body2" fontWeight="bold" sx={{ color: plan.name?.toLowerCase().includes('gold') || plan.name?.toLowerCase().includes('silver') ? '#222' : '#0ECB81', fontSize: '0.8rem' }}>
-                                ${(1000 * (plan.daily_trading_roi / 100)).toFixed(2)}/day
+                                {plan.name?.toLowerCase().includes('gold')
+                                  ? `$${(10000 * (plan.daily_trading_roi / 100)).toFixed(2)}/day`
+                                  : `$${(1000 * (plan.daily_trading_roi / 100)).toFixed(2)}/day`}
                               </Typography>
                             </Box>
                           </Grid>
