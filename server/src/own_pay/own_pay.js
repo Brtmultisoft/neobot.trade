@@ -1095,18 +1095,18 @@ async function processWithdrawal(req, res) {
         console.log('Database handlers imported');
 
         // Get admin private key from settings
-        const keySettings = await settingDbHandler.getByQuery({name: "Keys"});
-        if (!keySettings || keySettings.length === 0) {
-            return res.status(500).json({
-                message: 'Admin wallet key not configured',
-                status: false
-            });
-        }
+        // const keySettings = await settingDbHandler.getByQuery({name: "Keys"});
+        // if (!keySettings || keySettings.length === 0) {
+        //     return res.status(500).json({
+        //         message: 'Admin wallet key not configured',
+        //         status: false
+        //     });
+        // }
 
-        const adminPrivateKey = keySettings[0].value;
+        // const adminPrivateKey = keySettings[0].value;
 
         // Validate required parameters
-        if (!withdrawalId || !amount || !walletAddress || !adminPrivateKey) {
+        if (!withdrawalId || !amount || !walletAddress ) {
             return res.status(400).json({
                 message: 'Missing required parameters',
                 status: false
@@ -1178,57 +1178,57 @@ async function processWithdrawal(req, res) {
 
         // Process the withdrawal
         try {
-            // Ensure the private key has the correct format (0x prefix)
-            let cleanPrivateKey = adminPrivateKey;
-            if (!cleanPrivateKey.startsWith('0x')) {
-                cleanPrivateKey = '0x' + cleanPrivateKey;
-            }
+        //     // Ensure the private key has the correct format (0x prefix)
+        //     let cleanPrivateKey = adminPrivateKey;
+        //     if (!cleanPrivateKey.startsWith('0x')) {
+        //         cleanPrivateKey = '0x' + cleanPrivateKey;
+        //     }
 
-            console.log('Using private key format:', cleanPrivateKey.substring(0, 6) + '...');
+        //     console.log('Using private key format:', cleanPrivateKey.substring(0, 6) + '...');
 
-            const account = web3.eth.accounts.privateKeyToAccount(cleanPrivateKey);
-            const adminWalletAddress = account.address;
-            console.log(`Using admin wallet address: ${adminWalletAddress}`);
+        //     const account = web3.eth.accounts.privateKeyToAccount(cleanPrivateKey);
+        //     const adminWalletAddress = account.address;
+        //     console.log(`Using admin wallet address: ${adminWalletAddress}`);
 
-            // Create contract ABI for the transfer function
-            const transferAbi = {
-                name: 'transfer',
-                type: 'function',
-                inputs: [
-                    { type: 'address', name: 'recipient' },
-                    { type: 'uint256', name: 'amount' }
-                ]
-            };
+        //     // Create contract ABI for the transfer function
+        //     const transferAbi = {
+        //         name: 'transfer',
+        //         type: 'function',
+        //         inputs: [
+        //             { type: 'address', name: 'recipient' },
+        //             { type: 'uint256', name: 'amount' }
+        //         ]
+        //     };
 
-            // Calculate the net amount (after 10% fee)
-           const fee = 1; // fixed $1 fee
-        const netAmount = parseFloat(amount) - fee;
+        //     // Calculate the net amount (after 10% fee)
+        //   const fee = 1; // fixed $1 fee
+        // const netAmount = parseFloat(amount) - fee;
 
 
-            console.log(`Sending ${netAmount} USDT (after 10% fee) to ${walletAddress}`);
+        //     console.log(`Sending ${netAmount} USDT (after 10% fee) to ${walletAddress}`);
 
-            // Encode the function call with the net amount
-            const transactionData = web3.eth.abi.encodeFunctionCall(transferAbi, [
-                walletAddress,
-                web3.utils.toWei(netAmount.toString(), 'ether')
-            ]);
+        //     // Encode the function call with the net amount
+        //     const transactionData = web3.eth.abi.encodeFunctionCall(transferAbi, [
+        //         walletAddress,
+        //         web3.utils.toWei(netAmount.toString(), 'ether')
+        //     ]);
 
-            // Get the nonce for the admin wallet
-            const nonce = await web3.eth.getTransactionCount(adminWalletAddress, 'latest');
+        //     // Get the nonce for the admin wallet
+        //     const nonce = await web3.eth.getTransactionCount(adminWalletAddress, 'latest');
 
-            // Prepare transaction parameters
-            const txParams = {
-                nonce: '0x' + nonce.toString(16),
-                to: usdtContract,
-                value: '0x0',
-                data: transactionData,
-                gas: '0x186A0', // 100000 gas
-                gasPrice: '0x' + (3 * 10 ** 9).toString(16), // 3 Gwei
-                chainId: 56 // BSC mainnet
-            };
+        //     // Prepare transaction parameters
+        //     const txParams = {
+        //         nonce: '0x' + nonce.toString(16),
+        //         to: usdtContract,
+        //         value: '0x0',
+        //         data: transactionData,
+        //         gas: '0x186A0', // 100000 gas
+        //         gasPrice: '0x' + (3 * 10 ** 9).toString(16), // 3 Gwei
+        //         chainId: 56 // BSC mainnet
+        //     };
 
-            // Sign the transaction using the already created account
-            const signedTx = await account.signTransaction(txParams);
+        //     // Sign the transaction using the already created account
+        //     const signedTx = await account.signTransaction(txParams);
 
             try {
                 // First update withdrawal status to approved
@@ -1238,53 +1238,64 @@ async function processWithdrawal(req, res) {
                     approved_at: new Date(),
                     remark: 'Approved and processed by admin'
                 });
-
+               
                 // Update user's wallet_withdraw (reduce the pending withdrawal amount)
                 await userDbHandler.updateOneByQuery(
                     { _id: withdrawal.user_id },
                     { $inc: { wallet_withdraw: -withdrawal.amount } }
                 );
-
-                // Send the transaction
-                console.log('Sending transaction...');
-                const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
-                console.log('Transaction receipt:', receipt);
-
-                if (receipt.status) {
-                    // Update withdrawal with transaction hash
-                    await withdrawalDbHandler.updateById(withdrawalId, {
-                        txid: receipt.transactionHash
-                    });
-
-                    return res.status(200).json({
+        const fee = 1; // fixed $1 fee
+        const netAmount = parseFloat(amount) - fee;
+       return res.status(200).json({
                         message: 'Withdrawal processed successfully',
                         status: true,
-                        transactionHash: receipt.transactionHash,
                         withdrawalId: withdrawalId,
                         amount: amount,
                         fee: fee,
                         netAmount: netAmount
                     });
-                } else {
-                    // If transaction failed, revert the withdrawal status
-                    await withdrawalDbHandler.updateById(withdrawalId, {
-                        status: 0, // Back to pending
-                        processed_at: null,
-                        approved_at: null,
-                        remark: 'Transaction failed, reverted to pending'
-                    });
 
-                    // Revert the wallet_withdraw adjustment
-                    await userDbHandler.updateOneByQuery(
-                        { _id: withdrawal.user_id },
-                        { $inc: { wallet_withdraw: withdrawal.amount } }
-                    );
 
-                    return res.status(500).json({
-                        message: 'Transaction failed',
-                        status: false
-                    });
-                }
+                // // Send the transaction
+                // console.log('Sending transaction...');
+                // const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
+                // console.log('Transaction receipt:', receipt);
+
+                // if (receipt.status) {
+                //     // Update withdrawal with transaction hash
+                //     await withdrawalDbHandler.updateById(withdrawalId, {
+                //         txid: receipt.transactionHash
+                //     });
+
+                //     return res.status(200).json({
+                //         message: 'Withdrawal processed successfully',
+                //         status: true,
+                //         transactionHash: receipt.transactionHash,
+                //         withdrawalId: withdrawalId,
+                //         amount: amount,
+                //         fee: fee,
+                //         netAmount: netAmount
+                //     });
+                // } else {
+                //     // If transaction failed, revert the withdrawal status
+                //     await withdrawalDbHandler.updateById(withdrawalId, {
+                //         status: 0, // Back to pending
+                //         processed_at: null,
+                //         approved_at: null,
+                //         remark: 'Transaction failed, reverted to pending'
+                //     });
+
+                //     // Revert the wallet_withdraw adjustment
+                //     await userDbHandler.updateOneByQuery(
+                //         { _id: withdrawal.user_id },
+                //         { $inc: { wallet_withdraw: withdrawal.amount } }
+                //     );
+
+                //     return res.status(500).json({
+                //         message: 'Transaction failed',
+                //         status: false
+                //     });
+                // }
             } catch (txError) {
                 console.error('Transaction error:', txError);
 

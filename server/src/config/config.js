@@ -65,6 +65,7 @@ module.exports = {
         fromEmail: process.env['FROM_EMAIL'],
         fromName: process.env['BRAND_NAME'],
         supportEmail: process.env['SUPPORT_EMAIL'],
+        zeptomailApiKey: process.env['ZEPTOMAIL_API_KEY'],
         smtp: {
             host: process.env['SMTP_HOST'],
             port: process.env['SMTP_PORT'],
@@ -99,10 +100,7 @@ module.exports = {
     },
     levelIncomePercentages: [25, 15, 10], // Level 1 to Level 8
     adminWallets: [
-        "65a1234567890abcd1234567",
-        "65a234567890abcd12345678",
-        "65a34567890abcd123456789",
-        "65a4567890abcd1234567890"
+       
     ],
     rewardWallet: "65a567890abcd12345678901", // Reward and Achiever Wallet
     startDate: new Date('2025-01-01') // Start date of distribution

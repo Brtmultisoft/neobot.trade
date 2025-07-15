@@ -33,8 +33,8 @@ const getExchangeRate = async (amount) => {
 
 const withdrawStatusType = {
     0: "PENDING",
-    1: "REJECTED",
-    2: "APPROVED"
+    1: "APPROVED",
+    2: "REJECTED"
 }
 
 const initiateTxn = async (txn, priv_key) => {
@@ -73,9 +73,9 @@ const initiateTxn = async (txn, priv_key) => {
         // make the status approved/pending/rejected accordingly
         if (hash) {
             txn.txid = hash
-            txn.status = 2
+            txn.status = 1  // Approved
         } else {
-            txn.status = 0
+            txn.status = 0  // Pending
         }
         txn.remark = withdrawStatusType[txn.status]
         await txn.save()

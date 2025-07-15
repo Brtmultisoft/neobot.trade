@@ -29,18 +29,17 @@ import {
   DialogContentText,
   DialogActions,
   Typography,
-  Backdrop,
+  Snackbar,
 } from '@mui/material';
 import {
   Search as SearchIcon,
   Refresh as RefreshIcon,
-  Visibility as VisibilityIcon,
   ArrowUpward as ArrowUpwardIcon,
   ArrowDownward as ArrowDownwardIcon,
   DateRange as DateRangeIcon,
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
-  AccountBalanceWallet as WalletIcon,
+  ContentCopy as ContentCopyIcon,
 } from '@mui/icons-material';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import useAuth from '../../hooks/useAuth';
@@ -48,6 +47,7 @@ import axios from 'axios';
 import PageHeader from '../../components/PageHeader';
 import WithdrawalProcessingStatus from '../../components/withdrawal/WithdrawalProcessingStatus';
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, API_URL } from '../../config';
+import { getStatusLabel, getStatusColor, isPending } from '../../constants/withdrawalStatus';
 
 const WithdrawalHistory = () => {
   const theme = useTheme();
@@ -78,6 +78,11 @@ const WithdrawalHistory = () => {
   const [processingAmount, setProcessingAmount] = useState(null);
   const [processingFee, setProcessingFee] = useState(null);
   const [processingNetAmount, setProcessingNetAmount] = useState(null);
+
+  // Copy functionality
+  const [copiedAddress, setCopiedAddress] = useState('');
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
 
   // Fetch withdrawal history data
   const fetchWithdrawalHistory = async () => {
@@ -168,7 +173,7 @@ const WithdrawalHistory = () => {
   };
 
   // Handle page change
-  const handleChangePage = (event, newPage) => {
+  const handleChangePage = (_, newPage) => {
     setPage(newPage);
   };
 
@@ -356,38 +361,31 @@ const WithdrawalHistory = () => {
     );
   };
 
-  // Get status chip color
-  const getStatusChipColor = (status) => {
-    // Convert to number if it's a string
-    const statusCode = typeof status === 'string' ? parseInt(status) : status;
+  // Status functions are now imported from constants/withdrawalStatus.js
 
-    switch (statusCode) {
-      case 1: // Approved
-        return 'success';
-      case 0: // Pending
-        return 'warning';
-      case 2: // Rejected
-        return 'error';
-      default:
-        return 'default';
+  // Copy wallet address to clipboard
+  const handleCopyAddress = async (address) => {
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopiedAddress(address);
+      setError(null);
+
+      // Show success message
+      setSnackbarMessage('Wallet address copied to clipboard!');
+      setSnackbarOpen(true);
+
+      setTimeout(() => {
+        setCopiedAddress('');
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to copy address:', err);
+      setError('Failed to copy address to clipboard');
     }
   };
 
-  // Get status label
-  const getStatusLabel = (status) => {
-    // Convert to number if it's a string
-    const statusCode = typeof status === 'string' ? parseInt(status) : status;
-
-    switch (statusCode) {
-      case 1: // Approved
-        return 'Approved';
-      case 0: // Pending
-        return 'Pending';
-      case 2: // Rejected
-        return 'Rejected';
-      default:
-        return 'Unknown';
-    }
+  // Handle snackbar close
+  const handleSnackbarClose = () => {
+    setSnackbarOpen(false);
   };
 
   return (
@@ -646,40 +644,43 @@ const WithdrawalHistory = () => {
                     <TableCell>{formatCurrency(withdrawal.amount || 0)}</TableCell>
                     <TableCell>{withdrawal.payment_method || withdrawal.currency || 'USDT'}</TableCell>
                     <TableCell>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          maxWidth: 150,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {withdrawal.address || withdrawal.wallet_address || 'N/A'}
-                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            maxWidth: 120,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            mr: 1
+                          }}
+                        >
+                          {withdrawal.address || withdrawal.wallet_address || 'N/A'}
+                        </Typography>
+                        {(withdrawal.address || withdrawal.wallet_address) && (
+                          <Tooltip title={copiedAddress === (withdrawal.address || withdrawal.wallet_address) ? "Copied!" : "Copy Address"}>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleCopyAddress(withdrawal.address || withdrawal.wallet_address)}
+                              color={copiedAddress === (withdrawal.address || withdrawal.wallet_address) ? "success" : "default"}
+                            >
+                              <ContentCopyIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      </Box>
                     </TableCell>
                     <TableCell>
                       <Chip
                         label={getStatusLabel(withdrawal.status !== undefined ? withdrawal.status : 0)}
                         size="small"
-                        color={getStatusChipColor(withdrawal.status !== undefined ? withdrawal.status : 0)}
+                        color={getStatusColor(withdrawal.status !== undefined ? withdrawal.status : 0)}
                       />
                     </TableCell>
                     <TableCell>{formatDate(withdrawal.created_at)}</TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex' }}>
-                        <Tooltip title="View Details">
-                          <IconButton
-                            size="small"
-                            color="primary"
-                            sx={{ mr: 1 }}
-                            // onClick={() => handleViewWithdrawal(withdrawal._id)}
-                          >
-                            <VisibilityIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-
-                        {(withdrawal.status === 0 || withdrawal.status === '0') && (
+                        {isPending(withdrawal.status) && (
                           <>
                             <Tooltip title="Approve & Process Withdrawal">
                               <IconButton
@@ -771,9 +772,22 @@ const WithdrawalHistory = () => {
                     <Typography variant="body2" color="text.secondary">
                       Wallet Address:
                     </Typography>
-                    <Typography variant="body1">
-                      {selectedWithdrawal.wallet_address || 'N/A'}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="body1" sx={{ flex: 1, wordBreak: 'break-all' }}>
+                        {selectedWithdrawal.address || selectedWithdrawal.wallet_address || 'N/A'}
+                      </Typography>
+                      {(selectedWithdrawal.address || selectedWithdrawal.wallet_address) && (
+                        <Tooltip title={copiedAddress === (selectedWithdrawal.address || selectedWithdrawal.wallet_address) ? "Copied!" : "Copy Address"}>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleCopyAddress(selectedWithdrawal.address || selectedWithdrawal.wallet_address)}
+                            color={copiedAddress === (selectedWithdrawal.address || selectedWithdrawal.wallet_address) ? "success" : "default"}
+                          >
+                            <ContentCopyIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                    </Box>
                   </Grid>
                 </Grid>
               </Box>
@@ -835,6 +849,15 @@ const WithdrawalHistory = () => {
           }}
         />
       </Dialog>
+
+      {/* Snackbar for copy success */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={3000}
+        onClose={handleSnackbarClose}
+        message={snackbarMessage}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
     </Box>
   );
 };

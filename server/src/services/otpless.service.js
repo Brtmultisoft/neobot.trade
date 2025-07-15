@@ -4,7 +4,6 @@ const logger = require('./logger');
 const log = new logger('OTPlessService').getChildLogger();
 const emailOTPService = require('./email-otp.service');
 const smsOTPService = require('./sms-otp.service');
-const otpSettingsService = require('./otp-settings.service');
 
 /**
  * OTPless Service for handling OTP operations
@@ -165,60 +164,35 @@ class OTPlessService {
                 throw new Error('Phone number is required');
             }
 
-            // Normalize phone number - ensure proper format for OTPless API
+            // Normalize phone number - ensure proper format
             let normalizedPhone = phoneNumber.replace(/\s+/g, '').replace(/[^\d+]/g, '');
 
-            // OTPless expects phone numbers WITHOUT the '+' sign, just country code + number
-            // Remove '+' if present
-            if (normalizedPhone.startsWith('+')) {
-                normalizedPhone = normalizedPhone.substring(1);
-            }
-
             // If no country code provided, determine based on number length and pattern
-            if (normalizedPhone.length === 10) {
-                // Check if it looks like an Indian number (starts with 6-9)
-                if (/^[6-9]/.test(normalizedPhone)) {
-                    normalizedPhone = '91' + normalizedPhone; // India - OTPless format
-                } else {
-                    normalizedPhone = '1' + normalizedPhone; // US/Canada - OTPless format
-                }
-            } else if (normalizedPhone.length === 11) {
-                // Already has country code, keep as is
-                if (normalizedPhone.startsWith('1')) {
-                    // US/Canada number
-                } else if (normalizedPhone.startsWith('91')) {
-                    // Indian number
+            if (!normalizedPhone.startsWith('+')) {
+                if (normalizedPhone.length === 10) {
+                    // Check if it looks like an Indian number (starts with 6-9)
+                    if (/^[6-9]/.test(normalizedPhone)) {
+                        normalizedPhone = '+91' + normalizedPhone; // India
+                    } else {
+                        normalizedPhone = '+1' + normalizedPhone; // US/Canada
+                    }
+                } else if (normalizedPhone.length === 11 && normalizedPhone.startsWith('1')) {
+                    normalizedPhone = '+' + normalizedPhone; // US/Canada with 1
+                } else if (normalizedPhone.length === 11 && normalizedPhone.startsWith('91')) {
+                    normalizedPhone = '+' + normalizedPhone; // India with 91
                 } else {
                     // Default to India for 10-digit numbers starting with 6-9, otherwise US
-                    const lastTenDigits = normalizedPhone.substring(1);
-                    if (lastTenDigits.length === 10 && /^[6-9]/.test(lastTenDigits)) {
-                        normalizedPhone = '91' + lastTenDigits;
+                    if (normalizedPhone.length === 10 && /^[6-9]/.test(normalizedPhone)) {
+                        normalizedPhone = '+91' + normalizedPhone;
                     } else {
-                        normalizedPhone = '1' + lastTenDigits;
-                    }
-                }
-            } else if (normalizedPhone.length === 12) {
-                // Already properly formatted (country code + 10 digits)
-            } else {
-                // Default formatting for other cases
-                if (normalizedPhone.length >= 10) {
-                    const lastTenDigits = normalizedPhone.substring(-10);
-                    if (/^[6-9]/.test(lastTenDigits)) {
-                        normalizedPhone = '91' + lastTenDigits;
-                    } else {
-                        normalizedPhone = '1' + lastTenDigits;
+                        normalizedPhone = '+1' + normalizedPhone;
                     }
                 }
             }
 
-            // Validate phone number format for OTPless (country code + number, no '+')
-            if (normalizedPhone.length < 11 || normalizedPhone.length > 15) {
-                throw new Error('Invalid phone number format. Expected format: country code + number (e.g., 917367989866)');
-            }
-
-            // Validate that it contains only digits
-            if (!/^\d+$/.test(normalizedPhone)) {
-                throw new Error('Phone number should contain only digits after normalization');
+            // Validate phone number format (basic validation)
+            if (normalizedPhone.length < 10 || normalizedPhone.length > 16) {
+                throw new Error('Invalid phone number format. Please include country code.');
             }
 
             // Based on OTPless API documentation for SMS
@@ -240,12 +214,11 @@ class OTPlessService {
                 hasClientSecret: !!this.clientSecret
             });
 
-            console.log('📱 SENDING SMS OTP TO:', normalizedPhone);
-            log.info('Attempting to send SMS OTP via OTPless API', {
-                phoneNumber: normalizedPhone,
-                apiUrl: this.apiUrl,
-                hasCredentials: !!(this.clientId && this.clientSecret)
-            });
+            console.log('🔔 ATTEMPTING TO SEND REAL SMS OTP TO:', normalizedPhone);
+            console.log('📡 OTPless API URL:', this.apiUrl);
+            console.log('🔑 Client ID:', this.clientId ? 'Present' : 'Missing');
+            console.log('🔐 Client Secret:', this.clientSecret ? 'Present' : 'Missing');
+            console.log('📱 Request Data:', JSON.stringify(data, null, 2));
 
             let response;
             let lastError;
@@ -305,22 +278,15 @@ class OTPlessService {
 
             // Check for requestId
             if (response.data && response.data.requestId) {
-                console.log('✅ SMS OTP SENT SUCCESSFULLY TO:', normalizedPhone);
-                log.info('SMS OTP sent successfully via OTPless API', {
-                    phoneNumber: normalizedPhone,
-                    requestId: response.data.requestId,
-                    service: 'OTPless'
-                });
+                log.info('SMS OTP sent successfully', { phoneNumber: normalizedPhone, requestId: response.data.requestId });
 
                 return {
                     success: true,
                     requestId: response.data.requestId,
                     message: 'OTP sent successfully to your mobile number!',
-                    phoneNumber: normalizedPhone,
-                    service: 'OTPless'
+                    phoneNumber: normalizedPhone
                 };
             } else {
-                console.log('❌ SMS OTP FAILED - No requestId in response');
                 log.error('No requestId in SMS response:', response.data);
                 return {
                     success: false,
@@ -331,7 +297,7 @@ class OTPlessService {
 
         } catch (error) {
             console.log('❌ OTPless SMS API FAILED!');
-            console.log('📱 Phone Number:', phoneNumber, '→', normalizedPhone);
+            console.log('📱 Phone Number:', phoneNumber);
             console.log('🔴 Error Status:', error.response?.status);
             console.log('🔴 Error Message:', error.message);
             console.log('🔴 Error Response:', error.response?.data);
@@ -340,23 +306,18 @@ class OTPlessService {
                 message: error.message,
                 response: error.response?.data,
                 status: error.response?.status,
-                originalPhone: phoneNumber,
-                normalizedPhone: normalizedPhone
+                phoneNumber: phoneNumber
             });
 
             // Fallback to SMS OTP service
-            console.log('🔄 FALLING BACK TO TEST SMS SERVICE (OTP will be logged to console)');
-            log.info('Using SMS OTP fallback service - OTP will be logged for testing');
+            console.log('🔄 FALLING BACK TO TEST SMS SERVICE');
+            log.info('Using SMS OTP fallback service');
             try {
                 const fallbackResult = await smsOTPService.sendOTP(phoneNumber, otpLength, expiry);
                 if (fallbackResult.success) {
-                    console.log('✅ SMS OTP fallback successful - CHECK CONSOLE/LOGS FOR TEST OTP');
-                    log.info('SMS OTP fallback successful - using test service');
-                    return {
-                        ...fallbackResult,
-                        service: 'Fallback-Test',
-                        note: 'OTP logged to console - check server logs'
-                    };
+                    console.log('✅ SMS OTP fallback successful - CHECK CONSOLE FOR TEST OTP');
+                    log.info('SMS OTP fallback successful');
+                    return fallbackResult;
                 }
             } catch (fallbackError) {
                 log.error('SMS OTP fallback also failed:', fallbackError);
@@ -489,17 +450,8 @@ class OTPlessService {
      * @returns {Promise<Object>} - Response with requestId
      */
     async sendRegistrationOTP(email) {
-        // Check if email OTP is enabled
-        const isEmailOTPEnabled = await otpSettingsService.isEmailOTPEnabled();
-        if (!isEmailOTPEnabled) {
-            log.info('Email OTP is disabled by admin settings');
-            return {
-                success: false,
-                error: 'Email OTP is currently disabled by administrator',
-                disabled: true
-            };
-        }
-        return this.sendOTP(email, 4, 300); // 5 minutes expiry for registration
+        // Use the new email-otp.service.js registration method
+        return await emailOTPService.sendRegistrationOTP(email, 4, 300);
     }
 
     /**
@@ -508,16 +460,6 @@ class OTPlessService {
      * @returns {Promise<Object>} - Response with requestId
      */
     async sendRegistrationSMSOTP(phoneNumber) {
-        // Check if mobile OTP is enabled
-        const isMobileOTPEnabled = await otpSettingsService.isMobileOTPEnabled();
-        if (!isMobileOTPEnabled) {
-            log.info('Mobile OTP is disabled by admin settings');
-            return {
-                success: false,
-                error: 'Mobile OTP is currently disabled by administrator',
-                disabled: true
-            };
-        }
         return this.sendSMSOTP(phoneNumber, 4, 300); // 5 minutes expiry for registration
     }
 
@@ -527,18 +469,8 @@ class OTPlessService {
      * @returns {Promise<Object>} - Response with requestId
      */
     async sendLoginOTP(email) {
-        // Check if email OTP is enabled
-        const isEmailOTPEnabled = await otpSettingsService.isEmailOTPEnabled();
-        if (!isEmailOTPEnabled) {
-            log.info('Email OTP is disabled by admin settings for login');
-            return {
-                success: false,
-                error: 'Email OTP is currently disabled by administrator',
-                disabled: true
-            };
-        }
         log.info('Sending login OTP for 2FA to:', email);
-        return await this.sendOTP(email, 6, 300); // 6-digit OTP, 5 minutes expiry
+        return await emailOTPService.sendLoginOTP(email, 6, 300);
     }
 
     /**
@@ -558,18 +490,8 @@ class OTPlessService {
      * @returns {Promise<Object>} - Response with requestId
      */
     async sendForgotPasswordOTP(email) {
-        // Check if email OTP is enabled
-        const isEmailOTPEnabled = await otpSettingsService.isEmailOTPEnabled();
-        if (!isEmailOTPEnabled) {
-            log.info('Email OTP is disabled by admin settings for forgot password');
-            return {
-                success: false,
-                error: 'Email OTP is currently disabled by administrator',
-                disabled: true
-            };
-        }
         log.info('Sending forgot password OTP to:', email);
-        return await this.sendOTP(email, 4, 600); // 4-digit OTP, 10 minutes expiry
+        return await emailOTPService.sendForgotPasswordOTP(email, 4, 600);
     }
 
     /**
@@ -589,18 +511,8 @@ class OTPlessService {
      * @returns {Promise<Object>} - Response with requestId
      */
     async send2FAOTP(email) {
-        // Check if email OTP is enabled
-        const isEmailOTPEnabled = await otpSettingsService.isEmailOTPEnabled();
-        if (!isEmailOTPEnabled) {
-            log.info('Email OTP is disabled by admin settings for 2FA');
-            return {
-                success: false,
-                error: 'Email OTP is currently disabled by administrator',
-                disabled: true
-            };
-        }
         log.info('Sending 2FA OTP to:', email);
-        return await this.sendOTP(email, 6, 180); // 6-digit OTP, 3 minutes expiry for 2FA
+        return await emailOTPService.send2FAOTP(email, 6, 180);
     }
 
     /**
@@ -631,16 +543,6 @@ class OTPlessService {
      * @returns {Promise<Object>} - Response with requestId
      */
     async sendForgotPasswordSMSOTP(phoneNumber) {
-        // Check if mobile OTP is enabled
-        const isMobileOTPEnabled = await otpSettingsService.isMobileOTPEnabled();
-        if (!isMobileOTPEnabled) {
-            log.info('Mobile OTP is disabled by admin settings for forgot password');
-            return {
-                success: false,
-                error: 'Mobile OTP is currently disabled by administrator',
-                disabled: true
-            };
-        }
         return this.sendSMSOTP(phoneNumber, 4, 300); // 5 minutes expiry for forgot password
     }
 
