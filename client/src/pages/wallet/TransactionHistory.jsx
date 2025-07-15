@@ -37,6 +37,7 @@ import PageHeader from '../../components/common/PageHeader';
 import useApi from '../../hooks/useApi';
 import WalletService from '../../services/wallet.service';
 import { formatCurrency, formatDate } from '../../utils/formatters';
+import { getStatusLabel, getStatusColor } from '../../constants/withdrawalStatus';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 
@@ -159,39 +160,7 @@ const TransactionHistory = () => {
     }
   };
 
-  // Get status label
-  const getStatusLabel = (status) => {
-    // Convert to number if it's a string
-    const statusCode = typeof status === 'string' ? parseInt(status) : status;
-
-    switch (statusCode) {
-      case 0:
-        return 'Pending';
-      case 2:
-        return 'Approved';
-      case 1:
-        return 'Rejected';
-      default:
-        return 'Unknown';
-    }
-  };
-
-  // Get status color
-  const getStatusColor = (status) => {
-    // Convert to number if it's a string
-    const statusCode = typeof status === 'string' ? parseInt(status) : status;
-
-    switch (statusCode) {
-      case 0:
-        return 'warning';
-      case 2:
-        return 'success';
-      case 1:
-        return 'error';
-      default:
-        return 'default';
-    }
-  };
+  // Status label and color functions are now imported from constants/withdrawalStatus.js
 
   // Combine and process deposit and withdrawal data
   useEffect(() => {

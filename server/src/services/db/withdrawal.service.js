@@ -156,8 +156,15 @@ class Withdrawal {
 		if (user_id) {
 			params.user_id = ObjectId(user_id);
 		}
+		// Handle numeric status values (0, 1, 2)
 		if (data.status !== undefined) {
-			params.status = data.status ? true : false;
+			// If it's a boolean query, use the original logic
+			if (typeof data.status === 'boolean') {
+				params.status = data.status ? true : false;
+			} else {
+				// Otherwise, use the numeric value
+				params.status = parseInt(data.status);
+			}
 		}
 		if (data.currency_coin !== undefined) {
 			params.currency_coin = data.currency_coin;

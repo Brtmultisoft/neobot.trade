@@ -53,15 +53,6 @@ const otplessController = {
                 };
                 log.info('Registration OTP sent successfully:', { email: normalizedEmail, requestId: otpResult.requestId });
                 return responseHelper.success(res, responseData);
-            } else if (otpResult.disabled) {
-                // OTP is disabled by admin
-                log.info('Email OTP is disabled by admin settings');
-                responseData.msg = 'Email verification is currently disabled. You can proceed with registration without OTP verification.';
-                responseData.data = {
-                    email: normalizedEmail,
-                    otp_disabled: true
-                };
-                return responseHelper.success(res, responseData);
             } else {
                 log.error('OTP service failed:', {
                     error: otpResult.error,
@@ -137,7 +128,7 @@ const otplessController = {
             // If a valid referral ID is provided, find the referring user
             if (trace_id) {
                 // First check if it's a sponsor ID
-                if (trace_id.startsWith('NB') || trace_id.startsWith('SI')) {
+                if (trace_id.startsWith('HS') || trace_id.startsWith('SI')) {
                     let sponsorUser = await userDbHandler.getOneByQuery({ sponsorID: trace_id }, { _id: 1 });
                     if (sponsorUser) {
                         refer_id = sponsorUser._id;
@@ -202,7 +193,7 @@ const otplessController = {
 
             // Generate a unique sponsor ID (matching existing logic)
             const generateSponsorId = async () => {
-                const prefix = 'NB';
+                const prefix = 'HS';
                 let isUnique = false;
                 let sponsorId = '';
 
@@ -219,9 +210,6 @@ const otplessController = {
 
             const sponsorID = await generateSponsorId();
 
-            // Hash the password manually since updateById doesn't trigger pre-save hooks
-            const hashedPassword = await passwordService.hashPassword(userData.password);
-
             // Create user with OTPless verification and proper referral data (matching existing structure)
             const newUserData = {
                 refer_id: refer_id,
@@ -230,7 +218,7 @@ const otplessController = {
                 trace_id: trace_id,
                 sponsorID: sponsorID, // Add the generated sponsor ID
                 email: normalizedEmail, // Store email
-                password: hashedPassword, // Password is now properly hashed
+                password: userData.password, // Pass plain password, let pre-save hook hash it
                 name: userData.name, // Store name
                 phone_number: userData.phone_number || userData.phone, // Store phone number
                 country: userData.country, // Store country
@@ -322,17 +310,6 @@ const otplessController = {
                 responseData.data = {
                     requestId: otpResult.requestId,
                     email: email,
-                    requiresTwoFA: userData.two_fa_enabled,
-                    twoFAMethod: userData.two_fa_method
-                };
-                return responseHelper.success(res, responseData);
-            } else if (otpResult.disabled) {
-                // OTP is disabled by admin
-                log.info('Email OTP is disabled by admin settings for login');
-                responseData.msg = 'Email OTP is currently disabled. Please use alternative login method or contact support.';
-                responseData.data = {
-                    email: email,
-                    otp_disabled: true,
                     requiresTwoFA: userData.two_fa_enabled,
                     twoFAMethod: userData.two_fa_method
                 };
@@ -512,14 +489,6 @@ const otplessController = {
                     requestId: otpResult.requestId
                 };
                 return responseHelper.success(res, responseData);
-            } else if (otpResult.disabled) {
-                // OTP is disabled by admin
-                log.info('Email OTP is disabled by admin settings for 2FA');
-                responseData.msg = '2FA OTP is currently disabled. Please use alternative authentication method or contact support.';
-                responseData.data = {
-                    otp_disabled: true
-                };
-                return responseHelper.success(res, responseData);
             } else {
                 responseData.msg = otpResult.error || 'Failed to send 2FA OTP';
                 return responseHelper.error(res, responseData);
@@ -573,15 +542,6 @@ const otplessController = {
                     phone_number: normalizedPhone
                 };
                 log.info('Mobile registration OTP sent successfully:', { phone: normalizedPhone, requestId: otpResult.requestId });
-                return responseHelper.success(res, responseData);
-            } else if (otpResult.disabled) {
-                // Mobile OTP is disabled by admin
-                log.info('Mobile OTP is disabled by admin settings');
-                responseData.msg = 'Mobile verification is currently disabled. You can proceed with registration without mobile OTP verification.';
-                responseData.data = {
-                    phone_number: normalizedPhone,
-                    otp_disabled: true
-                };
                 return responseHelper.success(res, responseData);
             } else {
                 log.error('Mobile OTP service failed:', {
