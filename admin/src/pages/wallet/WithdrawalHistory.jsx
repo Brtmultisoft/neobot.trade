@@ -323,21 +323,32 @@ const WithdrawalHistory = () => {
           throw apiError; // Re-throw to be caught by the outer catch
         }
       } else {
+        // For rejection, validate reason is provided
+        if (!actionReason || actionReason.trim() === '') {
+          setError('Please provide a reason for rejection');
+          setActionLoading(false);
+          return;
+        }
+
         // For rejection, use the existing endpoint
+        console.log('Rejecting withdrawal:', selectedWithdrawal._id, 'with reason:', actionReason);
         const response = await axios.post(`${API_URL}/admin/reject-withdrawal/${selectedWithdrawal._id}`, {
-          reason: actionReason,
+          reason: actionReason.trim(),
         }, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         });
 
+        console.log('Rejection response:', response.data);
         if (response.data && response.data.status) {
+          console.log('Rejection successful, refreshing data...');
           // Close dialog
           handleCloseDialog();
           // Refresh data
           fetchWithdrawalHistory();
         } else {
+          console.error('Rejection failed:', response.data);
           setError(response.data?.message || 'Failed to reject withdrawal');
         }
       }

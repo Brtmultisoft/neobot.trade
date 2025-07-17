@@ -4,6 +4,7 @@ const log = new logger('AdminWithdrawalController').getChildLogger();
 const { withdrawalDbHandler, userDbHandler } = require('../../services/db');
 const responseHelper = require('../../utils/customResponse');
 const config = require('../../config/config');
+const { WITHDRAWAL_STATUS } = require('../../constants/withdrawalStatus');
 // const { processWithdrawal } = require('../../own_pay/own_pay'); // Now handled in the route
 
 module.exports = {
@@ -238,8 +239,8 @@ module.exports = {
             }
 
             // Check if withdrawal is already processed
-            if (withdrawal.status !== 0) {
-                responseData.msg = `Withdrawal is already ${withdrawal.status === 1 ? 'approved' : 'rejected'}`;
+            if (withdrawal.status !== WITHDRAWAL_STATUS.PENDING) {
+                responseData.msg = `Withdrawal is already ${withdrawal.status === WITHDRAWAL_STATUS.APPROVED ? 'approved' : 'rejected'}`;
                 return responseHelper.error(res, responseData);
             }
 
@@ -254,7 +255,7 @@ module.exports = {
 
             // Update withdrawal status
             await withdrawalDbHandler.updateOneByQuery({_id: withdrawalId}, {
-                status: 1, // Approved
+                status: WITHDRAWAL_STATUS.APPROVED, // Approved = 1
                 txid: txid || 'manual-process',
                 processed_at: new Date(),
                 approved_at: new Date(),
@@ -329,6 +330,8 @@ module.exports = {
         let responseData = {};
         try {
             const { withdrawalId, reason } = req.body;
+            console.log('=== REJECTION PROCESS START ===');
+            console.log('REJECTION REQUEST - withdrawalId:', withdrawalId, 'reason:', reason);
 
             if (!withdrawalId) {
                 responseData.msg = 'Withdrawal ID is required';
@@ -349,8 +352,8 @@ module.exports = {
             }
 
             // Check if withdrawal is already processed
-            if (withdrawal.status !== 0) {
-                responseData.msg = `Withdrawal is already ${withdrawal.status === 1 ? 'approved' : 'rejected'}`;
+            if (withdrawal.status !== WITHDRAWAL_STATUS.PENDING) {
+                responseData.msg = `Withdrawal is already ${withdrawal.status === WITHDRAWAL_STATUS.APPROVED ? 'approved' : 'rejected'}`;
                 return responseHelper.error(res, responseData);
             }
 
@@ -391,7 +394,7 @@ module.exports = {
 
             // Update withdrawal status
             await withdrawalDbHandler.updateById(withdrawalId, {
-                status: 2, // Rejected
+                status: WITHDRAWAL_STATUS.REJECTED, // Rejected = 2
                 processed_at: new Date(),
                 remark: unlockStaking ? 'Rejected by admin (staking restored)' : 'Rejected by admin',
                 extra: {
@@ -401,6 +404,12 @@ module.exports = {
                     stakingRestored: unlockStaking && stakingAmount > 0
                 }
             });
+
+            console.log('=== VERIFICATION: Withdrawal status updated to 2 (REJECTED) for withdrawalId:', withdrawalId, '===');
+
+            // Verify the status was actually updated
+            const verifyRejectedWithdrawal = await withdrawalDbHandler.getById(withdrawalId);
+            console.log('=== VERIFICATION: Withdrawal status after rejection:', verifyRejectedWithdrawal.status, '(should be 2) ===');
 
             // If this withdrawal included unlocking staking, restore the investments to active status
             if (unlockStaking && stakingAmount > 0) {

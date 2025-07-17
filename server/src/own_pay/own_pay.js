@@ -1232,7 +1232,9 @@ async function processWithdrawal(req, res) {
 
             try {
                 // First update withdrawal status to approved
+                console.log('=== APPROVAL PROCESS START ===');
                 console.log('Updating withdrawal status to APPROVED (status: 1) for withdrawalId:', withdrawalId);
+
                 const updateResult = await withdrawalDbHandler.updateById(withdrawalId, {
                     status: 1, // Approved
                     processed_at: new Date(),
@@ -1243,7 +1245,7 @@ async function processWithdrawal(req, res) {
 
                 // Verify the status was actually updated
                 const verifyWithdrawal = await withdrawalDbHandler.getById(withdrawalId);
-                console.log('Verified withdrawal status after update:', verifyWithdrawal.status);
+                console.log('=== VERIFICATION: Withdrawal status after update:', verifyWithdrawal.status, '(should be 1) ===');
 
                 // Update user's wallet_withdraw (reduce the pending withdrawal amount)
                 await userDbHandler.updateOneByQuery(

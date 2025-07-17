@@ -31,10 +31,13 @@ const getExchangeRate = async (amount) => {
     }
 }
 
+// Import consistent status constants
+const { WITHDRAWAL_STATUS, getStatusLabel } = require('../../constants/withdrawalStatus');
+
 const withdrawStatusType = {
-    0: "PENDING",
-    1: "APPROVED",
-    2: "REJECTED"
+    [WITHDRAWAL_STATUS.PENDING]: "PENDING",
+    [WITHDRAWAL_STATUS.APPROVED]: "APPROVED",
+    [WITHDRAWAL_STATUS.REJECTED]: "REJECTED"
 }
 
 const initiateTxn = async (txn, priv_key) => {
@@ -73,9 +76,9 @@ const initiateTxn = async (txn, priv_key) => {
         // make the status approved/pending/rejected accordingly
         if (hash) {
             txn.txid = hash
-            txn.status = 1  // Approved
+            txn.status = WITHDRAWAL_STATUS.APPROVED  // Approved = 1
         } else {
-            txn.status = 0  // Pending
+            txn.status = WITHDRAWAL_STATUS.PENDING   // Pending = 0
         }
         txn.remark = withdrawStatusType[txn.status]
         await txn.save()
